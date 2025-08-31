@@ -1,0 +1,4134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlyLog | Paramotor dApp</title>
+    <meta name="description" content="A dApp UI for paramotor flying, showing maps, wind, and forecasts." />
+    <meta name="keywords" content="fly, log, paramotor, gps, forecast, dapp" />
+    <meta name="author" content="Xunorus & Gemini" />
+    <meta name="theme-color" content="#211e2c">
+    <link rel="manifest" id="manifest">
+
+
+    <link rel="icon" type="image/png" href="./favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+<link rel="shortcut icon" href="./favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-title" content="FlyLog" />
+<link rel="manifest" href="./site.webmanifest" />
+
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet.RotatedMarker for rotating icons -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.min.js"></script>
+
+    <!-- Leaflet Velocity Plugin JS -->
+    <script src="https://unpkg.com/leaflet-velocity/dist/leaflet-velocity.min.js"></script>
+
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/2.2.1/chartjs-plugin-annotation.min.js"></script>
+        
+    <!-- Tone.js for audio alerts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <!-- Ethers.js v6 for Web3 functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
+
+    <style>
+        /* --- THEME & CSS VARIABLES --- */
+        :root {
+            --bg-main: #211e2c;
+            --bg-secondary: #2c2440;
+            --bg-tertiary: #3a3052;
+            --border-color: #5D3FD3;
+            --text-primary: #e0d6ff;
+            --text-headings: #f0f0f0;
+            --accent-red: #e74c3c;
+            --accent-red-dark: #9a3324;
+            --accent-purple: #5D3FD3;
+            --accent-purple-dark: #3c2a8a;
+            --accent-green: #28a745;
+            --accent-green-dark: #1c6c2e;
+            --accent-yellow: #ffc107;
+            --accent-yellow-dark: #b98900;
+            --accent-blue: #3498db;
+            --accent-blue-dark: #217dbb;
+            --accent-grey: #6c757d;
+            --accent-grey-dark: #4a4e52;
+            --font-body: 'VT323', monospace;
+            --font-heading: 'Press Start 2P', cursive;
+        }
+
+        /* --- BASE & LAYOUT STYLES --- */
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: var(--font-body);
+            background-color: var(--bg-main);
+            background-image: linear-gradient(rgba(0, 0, 0, 0.1) 50%, transparent 50%);
+            background-size: 100% 4px;
+            color: var(--text-primary);
+        }
+
+        h2,
+        h4 {
+            font-family: var(--font-heading);
+            color: var(--text-headings);
+            font-size: 1.2rem;
+            text-shadow: 2px 2px #000;
+        }
+        h2 .certification-badge {
+            font-size: 0.8rem;
+            padding: 0.3rem 0.6rem;
+            background: var(--accent-yellow);
+            color: var(--bg-main);
+            margin-left: 1rem;
+            text-shadow: none;
+            vertical-align: middle;
+        }
+
+        .layout-wrapper {
+            display: grid;
+            grid-template-columns: 3fr 1fr;
+            height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+            transition: padding-top 0.3s ease;
+        }
+
+        .layout-main-content {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        #map-container {
+            position: relative;
+            height: 50vh;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            background-color: #1a1a1a;
+        }
+
+        .map-overlay {
+            position: absolute;
+            z-index: 1000;
+            background: rgba(33, 30, 44, 0.7);
+            backdrop-filter: blur(2px);
+            padding: 5px;
+            border-radius: 5px;
+            border: 2px solid var(--border-color);
+        }
+
+        .map-logo {
+            top: 10px;
+            left: 10px;
+        }
+
+        .map-logo svg {
+            width: 180px;
+            height: auto;
+        }
+
+        .anemometer-container {
+            top: 10px;
+            right: 10px;
+            width: 150px;
+            padding: 5px;
+        }
+
+        #anemometroSVG text {
+            font-family: var(--font-body);
+            fill: var(--text-primary);
+        }
+
+        .layout-chart-container {
+            flex-grow: 1;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #graficoViento {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .layout-sidebar {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-left: 2px solid var(--border-color);
+            padding: 1.5rem;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .sidebar-btn {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            font-family: var(--font-heading);
+            font-size: 0.8rem;
+            color: white;
+            border: 2px solid black;
+            border-radius: 0;
+            cursor: pointer;
+            text-shadow: 2px 2px #000;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        
+        .sidebar-btn:disabled {
+            background-color: var(--accent-grey);
+            box-shadow: 0 4px var(--accent-grey-dark);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .sidebar-btn:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: none !important;
+        }
+
+        #connectBtn {
+            background-color: var(--accent-red);
+            box-shadow: 0 4px var(--accent-red-dark);
+        }
+        
+        #connectBtn.connected {
+            background-color: var(--accent-green);
+            box-shadow: 0 4px var(--accent-green-dark);
+        }
+
+        #connectBtn:hover:not(:disabled) {
+            background-color: #c0392b;
+        }
+        
+        #connectBtn.connected:hover:not(:disabled) {
+            background-color: #1c6c2e;
+        }
+
+        .sidebar-btn-secondary {
+            background-color: var(--accent-purple);
+            box-shadow: 0 4px var(--accent-purple-dark);
+        }
+
+        .sidebar-btn-secondary:hover:not(:disabled) {
+            background-color: #4a31aa;
+        }
+
+        #controls {
+            margin-top: auto; /* Pushes controls to the bottom */
+            padding-top: 2rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border: 2px solid var(--border-color);
+        }
+
+        #controls label {
+            font-family: var(--font-heading);
+            font-size: 0.8rem;
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-headings);
+        }
+
+        #controls select, #realtime-api-select {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0;
+            border: 2px solid var(--border-color);
+            background: var(--bg-main);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        #realtime-api-select {
+            font-size: 1rem;
+            padding: 0.2rem;
+            margin-top: 5px;
+        }
+
+        /* --- FORECAST ACCORDION STYLES --- */
+        .accordion {
+            margin-bottom: 10px;
+        }
+
+        .accordion-item {
+            border: 2px solid var(--border-color);
+            overflow: hidden;
+            background-color: var(--bg-secondary);
+        }
+
+        .accordion-header {
+            background-color: var(--bg-tertiary);
+            color: var(--text-headings);
+            padding: 12px 16px;
+            width: 100%;
+            text-align: left;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: background-color 0.3s ease;
+            font-family: var(--font-body);
+        }
+
+        .accordion-header:hover {
+            background-color: #4a31aa;
+        }
+
+        .accordion-body {
+            display: none;
+            padding: 12px 16px;
+            font-size: 1.1rem;
+            line-height: 1.5;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .accordion-body p {
+            margin: 0.5rem 0;
+        }
+
+        /* --- MODAL STYLES --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 5000;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border: 2px solid var(--border-color);
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .modal-btn {
+            padding: 0.6rem 1.2rem;
+            border: 2px solid black;
+            border-radius: 0;
+            cursor: pointer;
+            font-family: var(--font-heading);
+            font-size: 0.7rem;
+            flex-grow: 1;
+        }
+
+        #closeModalBtn,
+        #discardFlightBtn,
+        #close-connect-modal-btn,
+        #cancelDisconnectBtn {
+            background-color: var(--accent-grey);
+            color: white;
+            box-shadow: 0 4px var(--accent-grey-dark);
+        }
+
+        #logFlightBtn, .modal-btn-confirm {
+            background-color: var(--accent-green);
+            color: white;
+            box-shadow: 0 4px var(--accent-green-dark);
+        }
+        
+        .modal-input {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0;
+            border: 2px solid var(--border-color);
+            background: var(--bg-main);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
+            text-align: center;
+            word-break: break-all;
+        }
+
+        /* NEW: Mnemonic Styles */
+        .mnemonic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .mnemonic-word {
+            font-family: var(--font-body);
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            text-align: left;
+        }
+        .mnemonic-word span {
+            color: var(--accent-grey);
+            margin-right: 0.5rem;
+        }
+        #restore-mnemonic-input {
+            width: 100%;
+            min-height: 80px;
+            resize: vertical;
+            text-align: left;
+            padding: 0.5rem;
+            box-sizing: border-box;
+            font-size: 1.1rem;
+        }
+
+        /* --- CLUB MODAL STYLES --- */
+        .club-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .club-card {
+            background-color: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .club-logo {
+            width: 60px;
+            height: 60px;
+            flex-shrink: 0;
+        }
+        .club-info {
+            flex-grow: 1;
+        }
+        .club-info h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1rem;
+        }
+        .join-club-btn {
+            font-size: 0.7rem !important;
+            padding: 0.6rem 1rem !important;
+        }
+        .join-club-btn:disabled {
+            background-color: var(--accent-yellow);
+            box-shadow: 0 4px var(--accent-yellow-dark);
+            color: #212529;
+            cursor: not-allowed;
+        }
+
+
+        /* --- FLY MODE STYLES --- */
+        #fly-mode-screen {
+            display: none; /* Set to block by JS */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 3000;
+            background: #000;
+            transition: border 0.5s ease, opacity 0.3s ease, visibility 0.3s;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #fly-mode-screen.show {
+            display: block;
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #fly-mode-screen.traffic-alert-active {
+            border: 8px solid var(--accent-yellow);
+            box-sizing: border-box;
+        }
+
+        #fly-map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        #fly-map.planning-mode {
+            cursor: crosshair;
+        }
+
+        .fly-mode-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 4000;
+            pointer-events: none;
+        }
+
+        .fly-mode-ui > * {
+            pointer-events: auto;
+        }
+
+        #flight-info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(33, 30, 44, 0.85);
+            backdrop-filter: blur(3px);
+            color: white;
+            padding: 15px;
+            border: 2px solid var(--border-color);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px 20px;
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .info-item {
+            padding: 5px;
+        }
+
+        .info-item .label {
+            font-family: var(--font-heading);
+            font-size: 0.6rem;
+            opacity: 0.8;
+            display: block;
+        }
+
+        .info-item .value {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+
+        .info-item.speed .value {
+            font-size: 2.5rem;
+            color: var(--accent-red);
+        }
+
+        #flight-controls {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+        
+        #flight-controls.flight-active {
+            display: none;
+        }
+
+        .flight-btn {
+            padding: 10px 20px;
+            font-family: var(--font-heading);
+            font-size: 0.8rem;
+            border: 2px solid black;
+            border-radius: 0;
+            cursor: pointer;
+        }
+        
+        #startFlightBtn.active {
+            background-color: var(--accent-yellow);
+            box-shadow: 0 4px var(--accent-yellow-dark);
+            color: #212529;
+        }
+
+        #startFlightBtn {
+            background-color: var(--accent-green);
+            color: white;
+            box-shadow: 0 4px var(--accent-green-dark);
+        }
+
+        #programTripBtn {
+            background-color: var(--accent-blue);
+            color: white;
+            box-shadow: 0 4px var(--accent-blue-dark);
+        }
+
+        #exitFlyModeBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: var(--accent-red);
+            color: white;
+            box-shadow: 0 4px var(--accent-red-dark);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid black;
+            font-size: 2.5rem;
+            font-weight: bold;
+            font-family: 'Arial', sans-serif;
+            padding: 0;
+            padding-bottom: 5px; /* Optical centering */
+            box-sizing: border-box;
+            cursor: pointer;
+            text-shadow: 2px 2px #000;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.1s ease;
+            display: none; /* Initial state */
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #exitFlyModeBtn:active {
+            transform: translateY(2px);
+            box-shadow: none !important;
+        }
+        
+        /* --- TRIP PLANNER & COMPASS STYLES (NEW) --- */
+        #trip-planner-panel {
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            padding: 10px;
+            display: none; /* Hidden by default */
+        }
+        #trip-planner-panel h4 {
+            font-size: 0.8rem;
+            margin: 0 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #trip-waypoints-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 1.1rem;
+        }
+        #trip-waypoints-list li {
+            padding: 4px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #trip-waypoints-list li.reached {
+            text-decoration: line-through;
+            opacity: 0.6;
+            color: var(--accent-green);
+        }
+        #trip-waypoints-list li.active {
+            color: var(--accent-yellow);
+            font-weight: bold;
+        }
+        #trip-planner-panel p {
+            margin-top: 10px;
+            padding-top: 5px;
+            border-top: 1px solid var(--border-color);
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        #shareTripBtn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 5px;
+            font-size: 0.7rem;
+        }
+
+        #compass-container {
+            position: absolute;
+            top: 150px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background: rgba(33, 30, 44, 0.7);
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            z-index: 4100;
+        }
+        #compass-arrow {
+            width: 80%;
+            height: 80%;
+            transition: transform 0.5s linear;
+        }
+
+
+        /* --- LOG & SETTINGS MODE STYLES --- */
+        .full-screen-ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 4500;
+            background: var(--bg-main);
+            padding: 2rem;
+            box-sizing: border-box;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s 0.3s;
+        }
+
+        .full-screen-ui.show {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease;
+        }
+
+        .ui-section {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border: 2px solid var(--border-color);
+        }
+
+        .full-screen-ui h2 {
+            margin-top: 0;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .full-screen-ui textarea,
+        .full-screen-ui input,
+        .full-screen-ui select {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0;
+            border: 2px solid var(--border-color);
+            background: var(--bg-main);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
+        }
+
+        #past-logs-list, #api-list, #onchain-logs-list {
+            list-style: none;
+            padding: 0;
+        }
+        .api-entry,
+        .log-entry {
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        .api-entry:last-child,
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry-header {
+            font-family: var(--font-heading);
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-headings);
+        }
+
+        .log-entry-stats {
+            font-size: 1rem;
+            color: #a094c0;
+            margin-bottom: 0.5rem;
+        }
+        .log-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .delete-log-btn, .delete-api-btn {
+            background: var(--accent-red);
+            color: white;
+            border: 2px solid black;
+            box-shadow: 0 2px var(--accent-red-dark);
+            padding: 5px 8px;
+            font-family: var(--font-heading);
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .settings-links a {
+            display: block;
+            margin: 1rem 0;
+            color: #ab92f9;
+            text-decoration: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .settings-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .settings-links > div {
+             margin: 1rem 0;
+             display: flex;
+             align-items: center;
+             gap: 1rem;
+        }
+
+        .disabled-link {
+            color: var(--accent-grey);
+            cursor: not-allowed;
+            text-decoration: none !important;
+        }
+        .dev-notice {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            font-family: var(--font-body);
+        }
+        
+        .full-screen-ui .close-btn {
+             background-color: var(--accent-grey);
+             margin-top: 1rem;
+             box-shadow: 0 4px var(--accent-grey-dark);
+        }
+
+        /* --- BREVET STYLES --- */
+        .brevet-header {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .brevet-profile-pic {
+            width: 120px;
+            height: 120px;
+            background-color: var(--bg-main);
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+            background-size: cover;
+            background-position: center;
+            flex-shrink: 0;
+        }
+        .brevet-info h2 {
+            margin: 0 0 0.5rem 0;
+        }
+        .brevet-info p {
+            margin: 0;
+            font-size: 1.1rem;
+            word-break: break-all;
+        }
+        #brevet-public-logs-list, #onchain-logs-list {
+            list-style: none;
+            padding: 0;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+        .public-log-entry {
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+        }
+         .public-log-entry:last-child {
+            border-bottom: none;
+        }
+
+
+        /* --- NOTIFICATION STYLES --- */
+        .notification-banner {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem;
+            border: 2px solid black;
+            z-index: 6000;
+            transition: bottom 0.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-family: var(--font-heading);
+            font-size: 0.7rem;
+            color: white;
+        }
+
+        .notification-banner.show {
+            bottom: 20px;
+        }
+
+        .notification-banner.error {
+            background-color: var(--accent-red);
+            box-shadow: 0 4px var(--accent-red-dark);
+        }
+
+        .notification-banner.success {
+            background-color: var(--accent-green);
+            box-shadow: 0 4px var(--accent-green-dark);
+        }
+        
+        .notification-banner.info {
+            background-color: var(--accent-blue);
+            box-shadow: 0 4px var(--accent-blue-dark);
+        }
+
+        #close-notification-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            font-family: monospace;
+        }
+
+        /* --- TRAFFIC ALERT STYLES --- */
+        #traffic-alert {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--accent-yellow);
+            color: #212529;
+            padding: 1rem;
+            border: 2px solid black;
+            box-shadow: 0 4px var(--accent-yellow-dark);
+            z-index: 5000;
+            transition: top 0.5s ease-in-out;
+            text-align: center;
+            font-family: var(--font-heading);
+            font-size: 0.8rem;
+        }
+
+        #traffic-alert.show {
+            top: 80px;
+        }
+
+        /* --- PRESALE NOTIFICATION STYLES --- */
+        #presale-notification {
+            position: sticky;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--accent-blue); /* Changed from red to blue */
+            color: white;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            text-shadow: 2px 2px #000;
+            opacity: 0;
+            visibility: hidden;
+            height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            overflow: hidden;
+            transition: all 0.5s ease;
+        }
+
+        #presale-notification.show {
+            opacity: 1;
+            visibility: visible;
+            height: auto;
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .presale-link-text {
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem;
+            flex-grow: 1;
+            text-align: center;
+            font-family: var(--font-heading);
+            font-size: 0.7rem;
+        }
+
+        #close-presale-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            padding: 0 15px;
+            text-shadow: 2px 2px #000;
+            align-self: stretch;
+        }
+        
+        /* Custom Pilot and Aircraft Icons */
+        .pilot-icon {
+            font-size: 24px;
+            text-shadow: 0 0 5px black;
+        }
+        .club-pilot-icon {
+            font-size: 24px;
+            /* Adding a purple glow to differentiate from the main pilot */
+            text-shadow: 0 0 8px var(--accent-purple), 0 0 5px black;
+        }
+        .aircraft-icon {
+            font-size: 24px;
+            text-shadow: 0 0 5px black;
+        }
+        .waypoint-icon {
+            background-color: var(--accent-blue);
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            text-align: center;
+            font-family: var(--font-heading);
+            font-size: 1rem;
+            line-height: 1.5rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            box-shadow: 0 0 5px black;
+        }
+        .waypoint-icon.reached {
+            background-color: var(--accent-green);
+        }
+        .club-pilot-tooltip {
+            background-color: rgba(93, 63, 211, 0.8); /* --accent-purple with transparency */
+            border: 1px solid var(--text-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 1.1rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            box-shadow: none;
+        }
+
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            html,
+            body {
+                overflow: auto;
+            }
+
+            .layout-wrapper {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow-y: auto;
+            }
+
+            .layout-main-content {
+                height: auto;
+            }
+
+            .layout-chart-container {
+                height: 45vh;
+                flex-grow: 0;
+            }
+
+            .layout-sidebar {
+                height: auto;
+                border-left: none;
+                border-top: 2px solid var(--border-color);
+            }
+
+            #map-container {
+                height: 40vh;
+            }
+
+            .anemometer-container {
+                width: 100px;
+                height: 100px;
+            }
+
+            #flight-info-panel {
+                grid-template-columns: repeat(2, 1fr);
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Presale Notification Banner -->
+    <div id="presale-notification">
+        <a href="/presale" class="presale-link-text" data-translate="support_flylog_banner">Token Presale! Participate now and get exclusive benefits on the platform.</a>
+        <button id="close-presale-btn">&times;</button>
+    </div>
+
+    <!-- Main Application Wrapper -->
+    <div class="layout-wrapper">
+
+        <!-- Main Content (Map and Chart) -->
+        <main class="layout-main-content">
+            <div id="map-container">
+                <div id="map"></div>
+                <div class="map-overlay map-logo">
+                    <svg viewBox="0 0 300 90" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Group to scale and position the complex path -->
+                        <g transform="translate(10,10) scale(0.09)">
+                            <!-- This is the exact path data extracted from the SVG you provided -->
+                            <path d="m 794.71869,680.24982 c -5.3398,-10.88392 -11.4246,-22.64946 -13.522,-26.1457 -2.0972,-3.49644 -7.888,-14.93873 -12.8681,-25.42751 -4.9804,-10.48894 -12.7433,-26.69896 -17.2509,-36.0223 -4.5077,-9.32355 -9.5704,-21.71935 -11.2504,-27.54646 -1.6803,-5.82726 -4.3173,-11.54832 -5.8605,-12.71373 -1.5423,-1.16606 -6.4604,-10.16749 -10.9274,-20.00452 -4.467,-9.83703 -11.778,-21.09835 -16.2465,-25.02497 -4.4684,-3.9265 -8.1245,-11.18701 -8.1245,-16.13428 0,-4.94727 -2.8244,-12.91058 -6.2764,-17.69625 -3.4522,-4.78564 -10.9365,-17.12907 -16.6318,-27.02981 -5.6953,-10.30092 -12.4847,-22.54294 -15.0874,-27.20464 -2.6026,-4.66167 -11.2819,-21.82519 -19.2872,-38.14124 -8.00527,-16.31605 -15.86399,-30.61885 -17.46375,-31.78429 -1.60006,-1.16607 -11.17223,-17.37558 -21.27221,-36.02233 -10.09984,-18.64687 -19.84963,-34.85689 -21.66614,-36.0223 -1.81668,-1.16606 -6.7969,-8.79368 -11.06747,-16.95177 -4.27075,-8.15796 -9.02861,-15.7862 -10.57328,-16.95161 -5.13579,-3.87507 -35.25399,-45.58097 -35.25399,-48.81793 0,-1.75118 -5.01125,-7.6936 -11.1361,-13.20531 -6.12485,-5.51173 -9.84944,-10.02139 -8.2769,-10.02139 1.57205,0 -2.74521,-6.38179 -9.59522,-14.1819 -6.84986,-7.80013 -17.36457,-20.29844 -23.36571,-27.77419 -15.75474,-19.62605 -66.15627,-68.229631 -70.75345,-68.229631 -2.14841,0 -11.1318,-4.76773 -19.96329,-10.59481 -8.83165,-5.82712 -18.85312,-10.59484 -22.27007,-10.59484 -3.41707,0 -12.84916,-4.91491 -20.9601,-10.92204 -16.78639,-12.43217 -35.01318,-15.63243 -90.82448,-15.94702 -52.16705,-0.29471 -68.52719,3.67038 -104.35523,25.28671 -16.58728,10.00779 -32.29946,17.01265 -34.91602,15.56659 -2.61638,-1.44637 -3.33542,-1.10199 -1.59842,0.76403 1.73766,1.86667 -6.31559,12.18454 -17.895879,22.92846 -11.58034,10.74395 -24.34554,25.732481 -28.36721,33.307711 -4.02164,7.57523 -9.22556,13.77329 -11.5645,13.77329 -2.33876,0 -4.25243,5.60863 -4.25243,12.46356 0,6.85511 -1.96397,13.64227 -4.36442,15.08287 -5.68494,3.41153 -5.68494,47.44346 0,50.855 2.40045,1.43997 4.36442,9.35988 4.36442,17.59855 0,11.41524 2.077,15.50668 8.72904,17.19589 4.80093,1.2189 8.72905,3.90101 8.72905,5.96004 0,2.05902 7.62499,3.74357 16.9444,3.74357 13.98773,0 20.0329,-2.99876 34.643179,-17.18516 9.73413,-9.45198 21.92463,-25.662 27.08977,-36.02232 5.34461,-10.72054 12.42027,-18.837 16.42149,-18.837 5.24332,0 5.77152,-1.22212 2.07763,-4.80905 -5.27069,-5.11785 3.88691,-23.52735 15.10433,-30.36435 3.0583,-1.86393 5.62289,-6.63166 5.69925,-10.59481 0.1832,-9.46721 6.73982,-16.87427 30.45639,-34.402971 10.77813,-7.9659 22.05147,-16.30435 25.05206,-18.53013 11.56037,-8.5747 4.99737,4.9492 -9.10252,18.75694 -19.77805,19.368631 -31.71994,50.365831 -40.23917,104.448961 -17.63903,111.97885 -18.02255,113.62495 -28.95609,124.24124 -13.3551,12.96777 -38.02412,15.38671 -59.474169,5.83176 -37.38757,-16.65436 -77.24848,-49.53391 -73.0208,-60.23157 1.25862,-3.18454 0.51471,-4.72557 -1.65353,-3.4245 -2.16786,1.30062 -8.03738,-4.06951 -13.0434896,-11.93435 -7.6669,-12.04582 -9.10168002,-21.10713 -9.10168002,-57.48232 0,-38.17519 1.26520002,-45.38268 10.91124962,-62.15937 6.00115,-10.43738 10.91126,-20.81436 10.91126,-23.05983 0,-4.60465 32.3204,-37.995631 36.77756,-37.995631 1.58521,0 10.47726,-6.82259 19.75907,-15.16137 16.69383,-14.99781 35.785809,-27.12773 56.940089,-36.1764 6.0013,-2.56694 14.34832,-6.38531 18.5491,-8.48501 5.3062,-2.65232 7.65832,-2.18957 7.70468,1.51524 0.0498,3.63288 1.08871,3.86352 3.2734,0.72399 7.81221,-11.2305397 53.49035,-16.78118968 129.77697,-15.76969968 59.60498,0.78962 109.27806,6.91085998 117.62308,14.49313968 2.28038,2.07197 7.54119,3.76725 11.69053,3.76725 4.1495,0 10.13977,2.45627 13.31173,5.45822 3.17212,3.00197 13.04893,8.77431 21.94887,12.82716 8.89976,4.05303 17.36272,9.22502 18.80661,11.49351 1.44336,2.26838 5.58643,4.12446 9.2056,4.12446 6.50706,0 37.37535,20.34536 40.18654,26.48704 0.80008,1.74815 3.46346,3.17833 5.91869,3.17833 2.45505,0 12.60256,6.18107 22.54979,13.73548 22.43469,17.038101 94.46479,86.791471 94.46479,91.479091 0,1.89358 4.9099,7.58822 10.9112,12.65482 6.0012,5.06674 10.9111,11.22285 10.9111,13.68038 0,2.05755 4.9101,8.88689 10.9113,14.2873 6.0011,5.40041 10.9112,11.84561 10.9112,14.32268 0,2.4771 4.9102,8.25405 10.9113,12.83772 6.0011,4.58367 10.9451,9.96647 10.9867,11.9619 0.05,1.99545 4.9515,8.11902 10.9112,13.60818 5.9596,5.48897 10.8357,11.98367 10.8357,14.43254 0,2.44907 4.9101,10.70343 10.9113,18.34321 6.0012,7.63979 10.9113,16.12705 10.9113,18.86071 0,2.73351 4.9101,8.72032 10.9112,13.30399 6.0012,4.58367 10.9113,11.80559 10.9113,16.04872 0,4.24315 2.9459,8.81257 6.5466,10.15419 3.6007,1.34224 6.5469,5.35986 6.5469,8.92934 0,3.56945 1.9639,6.48988 4.3644,6.48988 2.4004,0 4.3644,3.06284 4.3644,6.8064 0,3.74357 5.8921,14.03006 13.0935,22.85897 7.2015,8.82876 13.0935,17.68825 13.0935,19.68769 0,6.08194 36.2804,22.71578 49.518,22.70328 23.6229,-0.0151 53.3769,-29.15538 60.0668,-58.81322 1.906,-8.44913 5.6087,-24.89747 8.2283,-36.55167 6.1028,-27.15082 5.9761,-87.12207 -0.2429,-114.42376 -2.6541,-11.65434 -6.2741,-29.7714 -8.0445,-40.26033 -3.6531,-21.60518 -13.7395,-46.61699 -18.8292,-46.61699 -1.8742,0 -3.4077,-4.53417 -3.4077,-10.07584 0,-5.54184 -2.6281,-12.19382 -5.8402,-14.78239 -3.2123,-2.58857 -8.0978,-12.02244 -10.8569,-20.9641 -3.0344,-9.83432 -9.3488,-18.508981 -15.982,-21.956091 -6.0312,-3.13409 -10.9657,-7.50282 -10.9657,-9.70807 0,-2.20543 -7.2285,-10.43866 -16.0632,-18.29629 -20.6273,-18.3459 -17.3612,-22.36385 3.7036,-4.55628 26.2492,22.19056 47.6656,38.801631 51.9604,40.301811 2.2242,0.77683 4.044,3.65709 4.044,6.40021 0,2.74312 4.9101,10.12935 10.9113,16.4136 6.0011,6.28424 10.9112,13.41626 10.9112,15.84882 0,2.43272 1.9641,4.42285 4.3646,4.42285 2.4004,0 4.3644,2.92046 4.3644,6.4899 0,3.56945 2.9461,7.58758 6.5468,8.92934 3.6007,1.34225 6.5467,5.03792 6.5467,8.21384 0,3.17609 4.2326,12.98412 9.4058,21.79574 5.1732,8.8116 11.0652,23.17259 13.0935,31.91323 2.0283,8.74066 5.6688,23.99715 8.0903,33.90338 11.55651,47.27785 13.58291,70.52573 8.8337,101.35074 -8.2878,53.79337 -12.5972,75.39 -16.1359,80.86809 -1.8861,2.91996 -2.9202,8.32341 -2.298,12.00754 0.6216,3.68416 -4.6698,19.25316 -11.7599,34.59759 -7.0902,15.34442 -12.0199,28.74516 -10.955,29.77925 1.0656,1.0347 -1.0574,4.29263 -4.7158,7.24094 -3.6588,2.94848 -6.6522,8.78246 -6.6522,12.96457 0,4.18211 -1.4731,8.23948 -3.2732,9.01648 -1.8005,0.77682 -10.0319,14.76205 -18.2923,31.07794 -8.2603,16.31602 -18.243,32.52604 -22.1837,36.0223 -3.9407,3.49627 -10.6542,11.585 -14.9188,17.9748 -4.2649,6.3898 -9.5034,10.56822 -11.6413,9.28524 -2.1378,-1.28299 -3.887,0.64076 -3.887,4.27424 0,3.63385 -2.2247,6.60697 -4.9438,6.60697 -5.2969,0 -21.2432,16.11999 -21.2432,21.47459 0,1.77424 -9.5926,8.95719 -21.3171,15.96206 l -21.3169,12.73601 z" fill="#e74c3c"/>
+                        </g>
+                        <!-- Text aligned next to the icon -->
+                       <text x="133" y="56" font-family="'Press Start 2P', cursive" font-size="24"
+                             fill="#ab92f9">FLYLOG</text>
+                    </svg>
+                </div>
+                <div class="map-overlay anemometer-container">
+                    <svg id="anemometroSVG" viewBox="0 0 200 200">
+                        <circle cx="100" cy="100" r="90" fill="none" stroke="#aaa" stroke-width="2" />
+                        <text x="100" y="25" text-anchor="middle" font-size="20" font-weight="bold">N</text>
+                        <text x="100" y="185" text-anchor="middle" font-size="20" font-weight="bold">S</text>
+                        <text x="15" y="105" text-anchor="middle" font-size="20" font-weight="bold">W</text>
+                        <text x="185" y="105" text-anchor="middle" font-size="20" font-weight="bold">E</text>
+                        <g id="flechaGrupo" transform="rotate(0, 100, 100)">
+                            <polygon points="100,20 90,80 110,80" fill="red" stroke="black" stroke-width="1" />
+                        </g>
+                        <circle cx="100" cy="100" r="10" fill="white" stroke="black" stroke-width="1" />
+                        <text id="velocidadTexto" x="100" y="125" text-anchor="middle" font-size="24"
+                            font-weight="bold">0 km/h</text>
+                        <text id="gustsTexto" x="100" y="155" text-anchor="middle" font-size="18" fill="var(--accent-yellow)">Gusts: 0</text>
+                    </svg>
+                    <select id="realtime-api-select" style="display: none;"></select>
+                </div>
+            </div>
+            <div class="layout-chart-container">
+                <canvas id="graficoViento"></canvas>
+            </div>
+        </main>
+
+        <!-- Right Sidebar -->
+        <aside class="layout-sidebar">
+            <div class="button-group">
+                <button id="connectBtn" class="sidebar-btn" data-translate="connect">CONNECT</button>
+                <button id="flyBtn" class="sidebar-btn sidebar-btn-secondary" data-translate="fly">Fly</button>
+                <button id="logBtn" class="sidebar-btn sidebar-btn-secondary" data-translate="log">Log</button>
+                <button id="brevetBtn" class="sidebar-btn sidebar-btn-secondary" data-translate="brevet">Brevet</button>
+                <button id="settingsBtn" class="sidebar-btn sidebar-btn-secondary" data-translate="settings">Settings</button>
+            </div>
+
+            <div id="resumenSemanal">
+                <!-- Forecast accordion will be injected here -->
+            </div>
+
+            <div id="controls">
+                <label for="zonaSelect" data-translate="zona">Zona:</label>
+                <select id="zonaSelect"></select>
+                <label for="hourSelect" style="margin-top:1rem;" data-translate="hora">Hora:</label>
+                <select id="hourSelect"></select>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modals -->
+    <div id="share-trip-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 data-translate="share_trip">Share Trip</h2>
+            <p>Share this link with other pilots so they can join your flight plan!</p>
+            <input type="text" id="share-trip-id-input" class="modal-input" readonly>
+            <div class="modal-footer">
+                <button id="copy-trip-id-btn" class="modal-btn modal-btn-confirm" data-translate="copy_id">Copy Link</button>
+                <button class="modal-btn" data-translate="close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UPDATED: Connect Modal is now the login choice modal -->
+    <div id="connect-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 data-translate="connect_account">Connect Account</h2>
+            <p data-translate="connect_account_desc" style="font-size: 1.1rem; line-height: 1.5;">Create a new secure account or restore an existing one from your recovery phrase.</p>
+            <div class="button-group" style="margin-top: 1.5rem;">
+                <button id="create-wallet-btn" class="sidebar-btn sidebar-btn-secondary" data-translate="create_new_account">Create New Account</button>
+                <button id="restore-wallet-btn" class="sidebar-btn sidebar-btn-secondary" data-translate="restore_account">Restore Account</button>
+            </div>
+            <button id="close-connect-modal-btn" class="sidebar-btn" data-translate="cancel">Cancel</button>
+        </div>
+    </div>
+    
+    <!-- NEW: Wallet Flow Modal (for create/restore/password steps) -->
+    <div id="wallet-flow-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="wallet-flow-title"></h2>
+            <div id="wallet-flow-content" style="margin: 1.5rem 0;">
+                <!-- Content is dynamically inserted by JS -->
+            </div>
+            <div id="wallet-flow-footer" class="modal-footer">
+                <!-- Buttons are dynamically inserted by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Unlock Modal (for page load) -->
+    <div id="unlock-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 data-translate="unlock_wallet">Unlock Wallet</h2>
+            <p data-translate="unlock_wallet_desc" style="font-size: 1.1rem; line-height: 1.5;">Enter your password to unlock your encrypted wallet.</p>
+            <input type="password" id="unlock-password-input" class="modal-input" placeholder="Password..." style="margin-top: 1rem;">
+            <div class="modal-footer">
+                <button id="unlock-wallet-btn" class="modal-btn modal-btn-confirm" data-translate="unlock">Unlock</button>
+                <button id="forget-wallet-btn" class="modal-btn" data-translate="forget_wallet">Forget Wallet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Disconnect Modal -->
+    <div id="disconnect-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 data-translate="disconnect_wallet">Disconnect Wallet?</h2>
+            <p data-translate="disconnect_wallet_confirm">Are you sure you want to disconnect and forget this wallet? You will need your recovery phrase to restore it.</p>
+            <div class="modal-footer">
+                <button id="confirmDisconnectBtn" class="modal-btn" style="background-color: var(--accent-red); box-shadow: 0 4px var(--accent-red-dark);" data-translate="disconnect">Disconnect</button>
+                <button id="cancelDisconnectBtn" class="modal-btn" data-translate="cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="flight-summary-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 data-translate="flight_summary">Flight Summary</h2>
+            </div>
+            <div id="flight-summary-content"></div>
+            <div class="modal-footer">
+                <button id="logFlightBtn" class="modal-btn" data-translate="log_flight">Log Flight</button>
+                <button id="discardFlightBtn" class="modal-btn" data-translate="discard">Discard</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="club-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 data-translate="flying_clubs">Flying Clubs</h2>
+            <div class="club-list">
+                <div class="club-card">
+                    <svg class="club-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M50 10 L90 50 L50 90 L10 50 Z" fill="var(--accent-purple)" />
+                        <text x="50" y="58" font-family="'Press Start 2P', cursive" font-size="24" fill="white" text-anchor="middle">B</text>
+                    </svg>
+                    <div class="club-info">
+                        <h4>ASOCIACION DE PARAMOTORES BERAZATEGUI</h4>
+                    </div>
+                    <button class="sidebar-btn join-club-btn" data-club-id="berazategui" data-translate="join">JOIN</button>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button id="close-club-modal-btn" class="sidebar-btn" data-translate="close">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Full-Screen UIs -->
+    <div id="fly-mode-screen">
+        <div id="fly-map"></div>
+        <div class="fly-mode-ui">
+            <div id="traffic-alert">TRAFFIC ALERT!</div>
+
+            <!-- Trip Planner Panel (NEW) -->
+            <div id="trip-planner-panel" class="map-overlay">
+                <h4 data-translate="trip_plan">Trip Plan</h4>
+                <ol id="trip-waypoints-list"></ol>
+                <button id="shareTripBtn" class="sidebar-btn sidebar-btn-secondary" data-translate="share_trip">Share Trip</button>
+            </div>
+
+            <!-- Compass (NEW) -->
+            <div id="compass-container">
+                <svg id="compass-arrow" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="50,0 65,50 50,40 35,50" fill="var(--accent-yellow)"/>
+                    <polygon points="50,100 65,50 50,60 35,50" fill="#FFF"/>
+                </svg>
+            </div>
+
+            <div id="flight-controls">
+                <button id="startFlightBtn" class="flight-btn" data-translate="start_flight">Start Flight</button>
+                <!-- New Program Trip Button -->
+                <button id="programTripBtn" class="flight-btn" data-translate="program_trip">Program Trip</button>
+            </div>
+            <button id="exitFlyModeBtn">&times;</button>
+
+            <div id="flight-info-panel">
+                <div class="info-item speed">
+                    <span class="label" data-translate="speed">Speed</span>
+                    <span id="flight-speed" class="value">0</span>
+                    <span class="unit">km/h</span>
+                </div>
+                <div class="info-item">
+                    <span class="label" data-translate="altitude">Altitude</span>
+                    <span id="flight-altitude" class="value">0</span>
+                    <span class="unit">m</span>
+                </div>
+                <div class="info-item">
+                    <span class="label" data-translate="gforce">G-Force</span>
+                    <span id="flight-gforce" class="value">1.0</span>
+                    <span class="unit">g</span>
+                </div>
+                <div class="info-item">
+                    <span class="label" data-translate="duration">Duration</span>
+                    <span id="flight-duration" class="value">00:00</span>
+                </div>
+                <div class="info-item">
+                    <span class="label" data-translate="distance">Distance</span>
+                    <span id="flight-distance" class="value">0.0</span>
+                    <span class="unit">km</span>
+                </div>
+                <div class="info-item">
+                    <span class="label" data-translate="max_altitude">Max Altitude</span>
+                    <span id="flight-max-altitude" class="value">0</span>
+                    <span class="unit">m</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="log-mode-screen" class="full-screen-ui">
+        <div class="ui-section" id="new-log-form">
+            <h2 data-translate="new_flight_log">New Flight Log</h2>
+            <div id="new-log-stats"></div>
+            <textarea id="log-comments" placeholder="Enter your comments about the flight..."></textarea>
+            <button id="saveLogBtn" class="sidebar-btn" style="background-color: var(--accent-green); box-shadow: 0 4px var(--accent-green-dark);"
+                data-translate="save_log">Save Log</button>
+        </div>
+        <div class="ui-section">
+            <h2 data-translate="past_logs">Past Logs (Local)</h2>
+            <ul id="past-logs-list">
+                <!-- Past logs will be inserted here -->
+            </ul>
+        </div>
+        <button id="exitLogModeBtn" class="sidebar-btn close-btn" data-translate="back_to_dashboard">Back to Dashboard</button>
+    </div>
+
+    <!-- NEW: Brevet Screen -->
+    <div id="brevet-mode-screen" class="full-screen-ui">
+        <div class="ui-section">
+            <div class="brevet-header">
+                <div id="brevet-profile-pic" class="brevet-profile-pic" title="Click to upload photo"></div>
+                <input type="file" id="photo-upload-input" style="display: none;" accept="image/*">
+                <div class="brevet-info">
+                    <h2 id="brevet-pilot-name">Pilot Name <span id="brevet-certification-badge" class="certification-badge" style="display: none;">CERTIFIED</span></h2>
+                    <p id="brevet-wallet-address">0x...</p>
+                    <p id="brevet-wallet-balance">Balance: 0.0 ETH</p>
+                </div>
+            </div>
+        </div>
+        <div class="ui-section">
+            <h2 data-translate="onchain_profile">On-Chain Profile</h2>
+            <p id="onchain-status" style="font-size: 1.1rem; line-height: 1.5;"></p>
+            <button id="register-pilot-btn" class="sidebar-btn sidebar-btn-secondary" style="margin-top: 1rem;" data-translate="register_onchain_profile">Register Profile on Blockchain</button>
+        </div>
+        <div class="ui-section">
+            <h2 data-translate="onchain_logs">On-Chain Flight Logs</h2>
+            <ul id="onchain-logs-list">
+                <!-- On-chain logs will be inserted here -->
+            </ul>
+        </div>
+        <button id="shareBrevetBtn" class="sidebar-btn sidebar-btn-secondary" data-translate="share_brevet">Share Brevet</button>
+        <button id="exitBrevetModeBtn" class="sidebar-btn close-btn" data-translate="close">Close</button>
+    </div>
+
+    <div id="settings-modal" class="full-screen-ui">
+        <div class="ui-section">
+            <h2 data-translate="settings">Settings</h2>
+            <label for="language-select" data-translate="language">Language</label>
+            <select id="language-select">
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+            </select>
+        </div>
+        <!-- NEW: Pilot Profile Section -->
+        <div class="ui-section">
+            <h2 data-translate="pilot_profile">Pilot Profile</h2>
+            <label for="pilot-name-input" data-translate="pilot_name">Pilot Name</label>
+            <input type="text" id="pilot-name-input" placeholder="e.g., Maverick">
+             <button id="update-profile-btn" class="sidebar-btn sidebar-btn-secondary" data-translate="update_profile">Update Profile</button>
+        </div>
+        <div class="ui-section">
+            <h2 data-translate="add_flying_site">Add Flying Site</h2>
+            <label for="site-name-input" data-translate="site_name">Site Name</label>
+            <input type="text" id="site-name-input" placeholder="e.g., My Secret Spot">
+            <label for="site-coords-input" data-translate="coordinates">Coordinates (Lat, Lon)</label>
+            <input type="text" id="site-coords-input" placeholder="-34.123, -58.456">
+            <!-- MODIFIED: Single API input field -->
+            <label for="site-api-input" data-translate="api_base_url">API Base URL (Optional)</label>
+            <input type="text" id="site-api-input" placeholder="e.g., http://192.168.1.100">
+            <button id="save-site-btn" class="sidebar-btn sidebar-btn-secondary" data-translate="save_site">Save Site</button>
+        </div>
+        <!-- NEW: Section to display saved sites and their APIs -->
+        <div class="ui-section">
+            <h2 data-translate="saved_sites">Saved Sites & APIs</h2>
+            <ul id="api-list">
+                <!-- List will be populated by JavaScript -->
+            </ul>
+        </div>
+        <div class="ui-section settings-links">
+            <div>
+                <a id="join-club-link" data-translate="join_club">Join a Flying Club</a>
+            </div>
+             <div>
+                <a href="#" class="disabled-link" onclick="event.preventDefault();" data-translate="create_club">Create Club</a> <span class="dev-notice" data-translate="in_development">(In Development)</span>
+            </div>
+            <div>
+                <a href="https://flylog.fun/docs" target="_blank" data-translate="docs">Docs</a>
+            </div>
+            <div>
+                <a href="#" class="disabled-link" onclick="event.preventDefault();" data-translate="buy_tokens">Buy Tokens</a> <span class="dev-notice" data-translate="in_development">(In Development)</span>
+            </div>
+            <div style="text-align: right; opacity: 0.7; font-size: 0.9rem; margin-top: 1.5rem;">
+                v 0.62 alpha
+            </div>
+        </div>
+        <button id="close-settings-btn" class="sidebar-btn close-btn" data-translate="close">Close</button>
+    </div>
+
+    <!-- Error Notification -->
+    <div id="error-notification" class="notification-banner">
+        <span id="error-message"></span>
+        <button id="close-notification-btn">&times;</button>
+    </div>
+
+    <script>
+
+         window.optionsList = [
+            //flare
+                {
+                    "BREVET_CONTRACT_ADDRESS": "0x2aC45C33602E1a8450302100F1897BFF6C91a5d6",//pilotBrevet.sol
+                    "TOKEN_CHAIN_NAME": 'Coston2',
+                    "CHAIN_ID": '114',
+                    "EXPLORER": 'https://coston2.testnet.flarescan.com/ | https://coston2-explorer.flare.network/',
+                    "API": 'https://coston2-api.flare.network/ext/C/rpc',
+
+                },
+                // sepolia
+                    {
+                    "BREVET_CONTRACT_ADDRESS": "0x2aC45C33602E1a8450302100F1897BFF6C91a5d6",//chatWalletTokenF
+                    "TOKEN_CHAIN_NAME": 'Arbitrum sepolia',
+                    "CHAIN_ID": '421614',
+                    "EXPLORER": 'https://sepolia.arbiscan.io/',
+                    "API": 'https://arbitrum-sepolia.infura.io/v3/b17405e634bd40308be3eb4fa2485c9a',
+
+                },
+
+            ]
+        // --- GLOBAL VARIABLES ---
+        let map, velocityLayer, windData, dailyData, flyMap, mapTileLayer, flyMapTileLayer;
+        let currentMapTheme = 'dark';
+        let zonaActual = { lat: -34.750, lon: -58.180 };
+        const zonasDeVuelo = {
+            "Berazategui": { lat: -34.750, lon: -58.180 },
+            "Merlo Oeste": { lat: -34.668, lon: -58.740 },
+            "La Plata": { lat: -34.920, lon: -57.950 }
+        };
+        
+        let flightSimulationInterval, flightStartTime, airTrafficInterval, gpsWatchId;
+        let initialAltitude = null, hasTakenOff = false, landingTimer = null, touchAndGoCount = 0;
+        let lastPosition = null, lastHeading = 0;
+        let pilotMarker, flightPathPolyline;
+        let airTrafficMarkers = {};
+        const ALERT_RADIUS_METERS = 5000;
+        let totalDistance = 0, maxAltitude = 0, maxSpeed = 0;
+        let lastFlightData = null;
+        let flightLogs = [];
+        let notificationTimeout, trafficAlertTimeout;
+        let globalResumenHorario = [];
+        let hourlyWindChart;
+        let alertSynth;
+        let wakeLock = null; // For Screen Wake Lock API
+        let barometer = null;
+        let seaLevelPressure = null;
+
+        // --- WEB3 & CONTRACT VARIABLES ---
+        let signer, connectedAccount, brevetContract;
+        // IMPORTANT: Replace with your deployed contract address
+        const contractAddress = "0x650C744D281ADeCC7808B7f0D377c07240e13a85"; // <--- REPLACE THIS
+        const contractABI = [
+            "constructor()", "event AttesterAdded(address indexed attesterAddress)", "event AttesterRemoved(address indexed attesterAddress)", "event FlightLogged(address indexed pilotAddress, uint256 timestamp, uint256 duration, uint256 distance)", "event PilotCertified(address indexed pilotAddress, address indexed attester)", "event PilotRegistered(address indexed pilotAddress, string name)", "event ProfileUpdated(address indexed pilotAddress, string newName)", "function addAttester(address _attesterAddress)", "function certifyPilot(address _pilotAddress)", "function flightLogs(address, uint256) view returns (uint256, uint256, uint256)", "function getFlightCount(address _pilotAddress) view returns (uint256)", "function isAttester(address) view returns (bool)", "function isCertified(address) view returns (bool)", "function logFlight(uint256 _duration, uint256 _distance)", "function owner() view returns (address)", "function pilots(address) view returns (string, address, bool)", "function registerPilot(address _pilotAddress, string _name)", "function removeAttester(address _attesterAddress)", "function updateProfile(string _newName)"
+        ];
+
+
+        //    let contractAddress = optionsList[optionsIndex].PRESALE_CONTRACT_ADDRESS
+                // let contractABI = optionsList[optionsIndex].PRESALE_ABI
+//   const readProvider = new ethers.JsonRpcProvider(optionsList[optionsIndex].API);
+        let provider = new ethers.JsonRpcProvider(`${optionsList[0].API}`); // <-- REPLACE with your RPC URL for read-only actions
+        // let provider = new ethers.JsonRpcProvider("https://sepolia.infura.io/v3/b17405e634bd40308be3eb4fa2485c9a"); // <-- REPLACE with your RPC URL for read-only actions
+        let pilotOnChainProfile = { isRegistered: false, isCertified: false, name: "" };
+
+        let isPlanningTrip = false;
+        let pilotProfile = { name: "Pilot", photo: null };
+        let mockPilotDatabase = {}; // Mock backend for club pilots
+        let clubTrafficInterval;
+        let clubPilotMarkers = {};
+        
+        // --- TRIP PLANNER VARIABLES ---
+        let tripWaypoints = [];
+        let currentWaypointIndex = -1;
+        let tripPathPolyline;
+        const REACH_THRESHOLD_METERS = 50; 
+
+
+        // --- DOM ELEMENTS ---
+        const layoutWrapper = document.querySelector('.layout-wrapper');
+        const zonaSelect = document.getElementById('zonaSelect');
+        const hourSelect = document.getElementById('hourSelect');
+        const connectBtn = document.getElementById('connectBtn');
+        const flyBtn = document.getElementById('flyBtn');
+        const logBtn = document.getElementById('logBtn');
+        const brevetBtn = document.getElementById('brevetBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const connectModal = document.getElementById('connect-modal');
+        const closeModalBtn = document.getElementById('close-connect-modal-btn');
+        const disconnectModal = document.getElementById('disconnect-modal');
+        const confirmDisconnectBtn = document.getElementById('confirmDisconnectBtn');
+        const cancelDisconnectBtn = document.getElementById('cancelDisconnectBtn');
+        const flyModeScreen = document.getElementById('fly-mode-screen');
+        const startFlightBtn = document.getElementById('startFlightBtn');
+        const exitFlyModeBtn = document.getElementById('exitFlyModeBtn');
+        const flightSummaryModal = document.getElementById('flight-summary-modal');
+        const logFlightBtn = document.getElementById('logFlightBtn');
+        const discardFlightBtn = document.getElementById('discardFlightBtn');
+        const logModeScreen = document.getElementById('log-mode-screen');
+        const exitLogModeBtn = document.getElementById('exitLogModeBtn');
+        const saveLogBtn = document.getElementById('saveLogBtn');
+        const pastLogsList = document.getElementById('past-logs-list');
+        const errorNotification = document.getElementById('error-notification');
+        const errorMessage = document.getElementById('error-message');
+        const closeNotificationBtn = document.getElementById('close-notification-btn');
+        const trafficAlert = document.getElementById('traffic-alert');
+        const presaleNotification = document.getElementById('presale-notification');
+        const closePresaleBtn = document.getElementById('close-presale-btn');
+        const languageSelect = document.getElementById('language-select');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+        const saveSiteBtn = document.getElementById('save-site-btn');
+        const joinClubLink = document.getElementById('join-club-link');
+        const clubModal = document.getElementById('club-modal');
+        const closeClubModalBtn = document.getElementById('close-club-modal-btn');
+        const joinClubButtons = document.querySelectorAll('.join-club-btn');
+        const pilotNameInput = document.getElementById('pilot-name-input');
+        const updateProfileBtn = document.getElementById('update-profile-btn');
+        const flightControls = document.getElementById('flight-controls');
+        
+        // Login Flow Modals & Buttons
+        const createWalletBtn = document.getElementById('create-wallet-btn');
+        const restoreWalletBtn = document.getElementById('restore-wallet-btn');
+        const walletFlowModal = document.getElementById('wallet-flow-modal');
+        const walletFlowTitle = document.getElementById('wallet-flow-title');
+        const walletFlowContent = document.getElementById('wallet-flow-content');
+        const walletFlowFooter = document.getElementById('wallet-flow-footer');
+        const unlockModal = document.getElementById('unlock-modal');
+        const unlockWalletBtn = document.getElementById('unlock-wallet-btn');
+        const forgetWalletBtn = document.getElementById('forget-wallet-btn');
+        const unlockPasswordInput = document.getElementById('unlock-password-input');
+
+        // Brevet DOM Elements
+        const brevetModeScreen = document.getElementById('brevet-mode-screen');
+        const exitBrevetModeBtn = document.getElementById('exitBrevetModeBtn');
+        const brevetProfilePic = document.getElementById('brevet-profile-pic');
+        const photoUploadInput = document.getElementById('photo-upload-input');
+        const brevetPilotName = document.getElementById('brevet-pilot-name');
+        const brevetWalletAddress = document.getElementById('brevet-wallet-address');
+        const brevetWalletBalance = document.getElementById('brevet-wallet-balance');
+        const onchainLogsList = document.getElementById('onchain-logs-list');
+        const shareBrevetBtn = document.getElementById('shareBrevetBtn');
+        const onchainStatus = document.getElementById('onchain-status');
+        const registerPilotBtn = document.getElementById('register-pilot-btn');
+        const brevetCertificationBadge = document.getElementById('brevet-certification-badge');
+        // Trip Planner DOM Elements
+        const programTripBtn = document.getElementById('programTripBtn');
+        const tripPlannerPanel = document.getElementById('trip-planner-panel');
+        const tripWaypointsList = document.getElementById('trip-waypoints-list');
+        const compassContainer = document.getElementById('compass-container');
+        const compassArrow = document.getElementById('compass-arrow');
+        const shareTripBtn = document.getElementById('shareTripBtn');
+        // Social Flying DOM Elements
+        const shareTripModal = document.getElementById('share-trip-modal');
+        const copyTripIdBtn = document.getElementById('copy-trip-id-btn');
+
+
+        // --- EVENT LISTENERS ---
+        connectBtn.addEventListener("click", handleConnectionClick);
+        closeModalBtn.addEventListener("click", () => connectModal.style.display = 'none');
+        confirmDisconnectBtn.addEventListener('click', disconnectWallet);
+        cancelDisconnectBtn.addEventListener('click', () => disconnectModal.style.display = 'none');
+        createWalletBtn.addEventListener('click', showCreateWalletFlow);
+        restoreWalletBtn.addEventListener('click', showRestoreWalletFlow);
+        unlockWalletBtn.addEventListener('click', handleUnlockWallet);
+        forgetWalletBtn.addEventListener('click', handleForgetWallet);
+        unlockPasswordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') handleUnlockWallet(); });
+        registerPilotBtn.addEventListener('click', registerPilotOnChain);
+        updateProfileBtn.addEventListener('click', updateProfileOnChain);
+
+
+        flyBtn.addEventListener("click", enterFlyMode);
+        logBtn.addEventListener("click", () => logModeScreen.classList.add('show'));
+        brevetBtn.addEventListener("click", enterBrevetMode);
+        settingsBtn.addEventListener("click", () => settingsModal.classList.add('show'));
+        closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('show'));
+        exitFlyModeBtn.addEventListener("click", exitFlyMode);
+        startFlightBtn.addEventListener("click", toggleFlight);
+        logFlightBtn.addEventListener("click", () => {
+            flightSummaryModal.style.display = 'none';
+            enterLogMode(lastFlightData);
+        });
+        discardFlightBtn.addEventListener("click", () => {
+            flightSummaryModal.style.display = 'none';
+            lastFlightData = null;
+        });
+        exitLogModeBtn.addEventListener("click", exitLogMode);
+        saveLogBtn.addEventListener("click", saveLog);
+        closeNotificationBtn.addEventListener('click', hideNotification);
+        programTripBtn.addEventListener('click', toggleTripPlanning);
+        shareTripBtn.addEventListener('click', generateShareableLink);
+        // Brevet Listeners
+        exitBrevetModeBtn.addEventListener('click', exitBrevetMode);
+        brevetProfilePic.addEventListener('click', () => photoUploadInput.click());
+        photoUploadInput.addEventListener('change', handlePhotoUpload);
+        shareBrevetBtn.addEventListener('click', generateBrevetLink);
+        
+        closePresaleBtn.addEventListener('click', () => {
+            presaleNotification.classList.remove('show');
+        });
+
+        window.addEventListener("click", (event) => {
+            if (event.target === connectModal) connectModal.style.display = 'none';
+            if (event.target === disconnectModal) disconnectModal.style.display = 'none';
+            if (event.target === flightSummaryModal) flightSummaryModal.style.display = 'none';
+            if (event.target === clubModal) clubModal.style.display = 'none';
+            if (event.target === shareTripModal) shareTripModal.style.display = 'none';
+            if (event.target === walletFlowModal) walletFlowModal.style.display = 'none';
+            if (event.target === unlockModal) unlockModal.style.display = 'none';
+        });
+        
+        shareTripModal.querySelector('[data-translate="close"]').addEventListener('click', () => {
+             shareTripModal.style.display = 'none';
+             // Reset modal title in case it was changed for the Brevet
+             setTimeout(() => { shareTripModal.querySelector('h2').textContent = translations[languageSelect.value].share_trip; }, 300);
+        });
+
+
+        zonaSelect.addEventListener("change", () => {
+            zonaActual = zonasDeVuelo[zonaSelect.value];
+            map.setView([zonaActual.lat, zonaActual.lon], 13);
+            loadWindForecast();
+        });
+
+        hourSelect.addEventListener("change", () => {
+            const index = parseInt(hourSelect.value);
+            renderWindLayer(index);
+            updateMapTheme();
+        });
+
+        languageSelect.addEventListener('change', (e) => setLanguage(e.target.value));
+        saveSiteBtn.addEventListener('click', saveNewFlyingSite);
+        
+        joinClubLink.addEventListener('click', () => {
+            settingsModal.classList.remove('show');
+            clubModal.style.display = 'flex';
+        });
+        
+        closeClubModalBtn.addEventListener('click', () => {
+            clubModal.style.display = 'none';
+        });
+
+        joinClubButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const clubId = e.target.dataset.clubId;
+                e.target.disabled = true;
+                const lang = languageSelect.value || 'en';
+                e.target.textContent = translations[lang].awaiting_approval;
+                localStorage.setItem(`flylog_club_status_${clubId}`, 'awaiting');
+            });
+        });
+
+        // --- INITIALIZATION ---
+        function initializeApp() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const langFromUrl = urlParams.get('lang');
+            if (langFromUrl && translations[langFromUrl]) {
+                localStorage.setItem('flylog_language', langFromUrl);
+            }
+            
+            // Disable buttons that require a wallet
+            flyBtn.disabled = true;
+            logBtn.disabled = true;
+            brevetBtn.disabled = true;
+
+
+            loadSettings();
+            populateZoneSelector();
+            initMap();
+            setupPWA();
+            // Initialize Tone.js synth for alerts
+            alertSynth = new Tone.Synth({
+                oscillator: { type: 'square' },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.2 }
+            }).toDestination();
+            
+            // Add some dummy pilots for demonstration
+            mockPilotDatabase = {
+                "0xGEMINI": { lat: -34.755, lng: -58.185, heading: 45, name: "Gem", clubId: "berazategui", isFlying: true, timestamp: Date.now() },
+                "0xSKYNET": { lat: -34.745, lng: -58.175, heading: 120, name: "Sky", clubId: "berazategui", isFlying: true, timestamp: Date.now() },
+                "0xOTHER": { lat: -34.925, lng: -57.955, heading: 200, name: "Otr", clubId: "la_plata", isFlying: true, timestamp: Date.now() }
+            };
+
+            checkForSharedTripOnLoad();
+            checkForSharedBrevet();
+            
+            // Check for existing encrypted wallet on load
+            const encryptedWallet = localStorage.getItem('flylog_encrypted_wallet');
+            if (encryptedWallet) {
+                unlockModal.style.display = 'flex';
+                unlockPasswordInput.focus();
+            }
+        }
+        
+        
+        function setupPWA() {
+             // PWA Service Worker Registration
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    const CACHE_NAME = 'flylog-cache-v1';
+                    const urlsToCache = [
+                        '/',
+                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+                        'https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.min.js',
+                        'https://unpkg.com/leaflet-velocity/dist/leaflet-velocity.min.js',
+                        'https://cdn.jsdelivr.net/npm/chart.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/2.2.1/chartjs-plugin-annotation.min.js',
+                        'https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap'
+                    ];
+
+                    self.addEventListener('install', event => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+                        );
+                    });
+
+                    self.addEventListener('fetch', event => {
+                        event.respondWith(
+                            caches.match(event.request).then(response => {
+                                return response || fetch(event.request);
+                            })
+                        );
+                    });
+                `;
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                navigator.serviceWorker.register(URL.createObjectURL(blob))
+                    .then(registration => console.log('Service Worker registered with scope:', registration.scope))
+                    .catch(error => console.log('Service Worker registration failed:', error));
+            }
+            // PWA Manifest
+            const manifest = {
+                "name": "FlyLog dApp",
+                "short_name": "FlyLog",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#211e2c",
+                "theme_color": "#211e2c",
+                "description": "A dApp for paramotor pilots.",
+                "icons": [{
+                    "src": "https://placehold.co/192x192/5D3FD3/FFFFFF?text=FlyLog",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }, {
+                    "src": "https://placehold.co/512x512/5D3FD3/FFFFFF?text=FlyLog",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            document.getElementById('manifest').href = URL.createObjectURL(manifestBlob);
+        }
+
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([zonaActual.lat, zonaActual.lon], 13);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            mapTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: ' &copy; FLYLOG'
+            }).addTo(map);
+            loadWindForecast();
+        }
+
+        // --- NOTIFICATIONS & ALERTS ---
+        function showNotification(message, type = 'error', duration = 5000) {
+            if (notificationTimeout) clearTimeout(notificationTimeout);
+            errorMessage.textContent = message;
+            errorNotification.className = 'notification-banner'; // Reset classes
+            errorNotification.classList.add(type);
+            errorNotification.classList.add('show');
+            if (duration > 0) {
+                notificationTimeout = setTimeout(hideNotification, duration);
+            }
+        }
+
+        function hideNotification() {
+            errorNotification.classList.remove('show');
+        }
+
+        function showTrafficAlert(aircraft) {
+            const callsign = aircraft[1] || 'N/A';
+            const altitude = aircraft[7] ? `${Math.round(aircraft[7])}m` : 'N/A';
+            const distance = pilotMarker.getLatLng().distanceTo([aircraft[6], aircraft[5]]) / 1000;
+
+            const lang = languageSelect.value || 'en';
+            const alertText = translations[lang].traffic_alert || 'TRAFFIC ALERT: {callsign} at {altitude}, {distance}km away!';
+            
+            trafficAlert.innerHTML = alertText
+                .replace('{callsign}', callsign)
+                .replace('{altitude}', altitude)
+                .replace('{distance}', distance.toFixed(1));
+
+            trafficAlert.classList.add('show');
+            flyModeScreen.classList.add('traffic-alert-active');
+
+            // Play sound alert
+            if (Tone.context.state !== 'running') {
+                Tone.context.resume();
+            }
+            alertSynth.triggerAttackRelease('C5', '0.1');
+            setTimeout(() => alertSynth.triggerAttackRelease('C5', '0.1'), 200);
+
+
+            const aircraftMarker = airTrafficMarkers[aircraft[0]];
+            if (aircraftMarker && aircraftMarker.circle) {
+                aircraftMarker.circle.setStyle({ color: 'var(--accent-yellow)', fillColor: 'var(--accent-yellow)', fillOpacity: 0.3 });
+            }
+
+            if (trafficAlertTimeout) clearTimeout(trafficAlertTimeout);
+            trafficAlertTimeout = setTimeout(() => {
+                trafficAlert.classList.remove('show');
+                flyModeScreen.classList.remove('traffic-alert-active');
+                if (aircraftMarker && aircraftMarker.circle) {
+                    aircraftMarker.circle.setStyle({ color: 'grey', fillColor: 'grey', fillOpacity: 0.1 });
+                }
+            }, 8000);
+        }
+        
+        // --- WEB3 & WALLET FUNCTIONS ---
+        async function handleConnectionClick() {
+            if (connectedAccount) {
+                disconnectModal.style.display = 'flex';
+            } else {
+                connectModal.style.display = 'flex';
+            }
+        }
+        
+        function showCreateWalletFlow() {
+            connectModal.style.display = 'none';
+            const wallet = ethers.Wallet.createRandom();
+            const mnemonic = wallet.mnemonic.phrase;
+            const words = mnemonic.split(' ');
+
+            walletFlowTitle.textContent = "Save Your Recovery Phrase";
+            walletFlowContent.innerHTML = `
+                <p style="font-size:1.1rem; line-height:1.5; color: var(--accent-yellow);">
+                    <strong>WARNING:</strong> Write these words down and store them somewhere safe. 
+                    This is the only way to recover your account.
+                </p>
+                <div class="mnemonic-grid">
+                    ${words.map((word, index) => `<div class="mnemonic-word"><span>${index + 1}.</span>${word}</div>`).join('')}
+                </div>
+            `;
+            walletFlowFooter.innerHTML = `
+                <button id="mnemonic-saved-btn" class="modal-btn modal-btn-confirm">I've Saved It, Continue</button>
+            `;
+            walletFlowModal.style.display = 'flex';
+
+            document.getElementById('mnemonic-saved-btn').onclick = () => {
+                promptForPassword(wallet, 'create');
+            };
+        }
+
+        function showRestoreWalletFlow() {
+            connectModal.style.display = 'none';
+            walletFlowTitle.textContent = "Restore From Phrase";
+            walletFlowContent.innerHTML = `
+                <p style="font-size:1.1rem; line-height:1.5;">Enter your 12-word recovery phrase below.</p>
+                <textarea id="restore-mnemonic-input" class="modal-input" placeholder="word1 word2 word3..."></textarea>
+            `;
+            walletFlowFooter.innerHTML = `
+                <button class="modal-btn" onclick="walletFlowModal.style.display = 'none'">Cancel</button>
+                <button id="confirm-restore-btn" class="modal-btn modal-btn-confirm">Restore</button>
+            `;
+            walletFlowModal.style.display = 'flex';
+
+            document.getElementById('confirm-restore-btn').onclick = () => {
+                const phrase = document.getElementById('restore-mnemonic-input').value.trim().toLowerCase();
+                if (ethers.Mnemonic.isValidMnemonic(phrase)) {
+                    const wallet = ethers.Wallet.fromPhrase(phrase);
+                    promptForPassword(wallet, 'restore');
+                } else {
+                    showNotification("Invalid recovery phrase. Please check your words.", 'error');
+                }
+            };
+        }
+
+        function promptForPassword(wallet, type) {
+            walletFlowTitle.textContent = type === 'create' ? "Create a Password" : "Set New Password";
+            walletFlowContent.innerHTML = `
+                <p style="font-size:1.1rem; line-height:1.5;">This password encrypts your wallet. You will need it to unlock your account on this device.</p>
+                <input type="password" id="wallet-password" class="modal-input" placeholder="Enter a strong password...">
+                <input type="password" id="wallet-password-confirm" class="modal-input" placeholder="Confirm password...">
+            `;
+            walletFlowFooter.innerHTML = `
+                <button class="modal-btn" onclick="walletFlowModal.style.display = 'none'">Cancel</button>
+                <button id="encrypt-wallet-btn" class="modal-btn modal-btn-confirm">Encrypt & Login</button>
+            `;
+            document.getElementById('wallet-password-confirm').addEventListener('keyup', (e) => {
+                if(e.key === 'Enter') document.getElementById('encrypt-wallet-btn').click();
+            });
+
+            document.getElementById('encrypt-wallet-btn').onclick = async () => {
+                const pass1 = document.getElementById('wallet-password').value;
+                const pass2 = document.getElementById('wallet-password-confirm').value;
+
+                if (pass1.length < 8) {
+                    showNotification("Password must be at least 8 characters.", "error");
+                    return;
+                }
+                if (pass1 !== pass2) {
+                    showNotification("Passwords do not match.", "error");
+                    return;
+                }
+                
+                showNotification("Encrypting wallet...", "info", 0);
+                try {
+                    const json = await wallet.encrypt(pass1);
+                    localStorage.setItem('flylog_encrypted_wallet', json);
+                    loginSuccess(wallet);
+                } catch(e) {
+                    showNotification("Could not encrypt wallet.", "error");
+                    console.error(e);
+                }
+            };
+        }
+        
+        async function handleUnlockWallet() {
+            const password = unlockPasswordInput.value;
+            const encryptedJson = localStorage.getItem('flylog_encrypted_wallet');
+            if (!password || !encryptedJson) return;
+
+            try {
+                const wallet = await ethers.Wallet.fromEncryptedJson(encryptedJson, password);
+                loginSuccess(wallet);
+            } catch (error) {
+                console.error("Decryption failed:", error);
+                showNotification("Incorrect password.", "error");
+                unlockPasswordInput.value = '';
+            }
+        }
+        
+        function handleForgetWallet() {
+             if (confirm("Are you sure you want to forget this wallet? This action cannot be undone. You will need your recovery phrase to access this account again.")) {
+                disconnectWallet();
+                unlockModal.style.display = 'none';
+             }
+        }
+
+        async function loginSuccess(wallet) {
+            // The wallet object is already connected to the default provider, 
+            // but we connect it to our specific one (e.g., Infura) for consistency.
+            signer = wallet.connect(provider); 
+            connectedAccount = wallet.address;
+
+            // Initialize the contract instance with the signer for transactions
+            brevetContract = new ethers.Contract(contractAddress, contractABI, signer);
+
+            // Update UI
+            const truncatedAddress = `${connectedAccount.substring(0, 6)}...${connectedAccount.substring(connectedAccount.length - 4)}`;
+            connectBtn.textContent = truncatedAddress;
+            connectBtn.classList.add('connected');
+            
+            // Enable features
+            flyBtn.disabled = false;
+            logBtn.disabled = false;
+            brevetBtn.disabled = false;
+
+            // Hide all modals
+            connectModal.style.display = 'none';
+            walletFlowModal.style.display = 'none';
+            unlockModal.style.display = 'none';
+
+            showNotification('Wallet connected successfully!', 'success');
+            
+            // Load local and on-chain data
+            loadPilotProfile();
+            await loadOnChainProfile();
+            
+            console.log("Local Wallet Connected:", connectedAccount);
+        }
+
+        function disconnectWallet() {
+            signer = null;
+            connectedAccount = null;
+            brevetContract = null;
+            pilotProfile = { name: "Pilot", photo: null }; 
+            
+            // THIS IS A DESTRUCTIVE ACTION
+            localStorage.removeItem('flylog_encrypted_wallet');
+            
+            const lang = languageSelect.value || 'en';
+            connectBtn.textContent = translations[lang].connect;
+            connectBtn.classList.remove('connected');
+            
+            // Disable features
+            flyBtn.disabled = true;
+            logBtn.disabled = true;
+            brevetBtn.disabled = true;
+            
+            disconnectModal.style.display = 'none';
+            showNotification('Wallet disconnected and forgotten.', 'info');
+        }
+
+        // --- FLY MODE ---
+        async function enterFlyMode() {
+            await requestWakeLock();
+            flightControls.classList.remove('flight-active');
+            exitFlyModeBtn.style.display = 'flex'; // Show exit button immediately
+            flyModeScreen.classList.add('show');
+            const lightUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+            const lightAttribution = '&copy; OpenStreetMap contributors';
+
+            if (!flyMap) {
+                flyMap = L.map('fly-map', { zoomControl: false }).setView([zonaActual.lat, zonaActual.lon], 15);
+                L.control.zoom({ position: 'bottomright' }).addTo(flyMap);
+                flyMapTileLayer = L.tileLayer(lightUrl, {
+                    attribution: lightAttribution
+                }).addTo(flyMap);
+            } else {
+                flyMap.setView([zonaActual.lat, zonaActual.lon], 15);
+                flyMapTileLayer.setUrl(lightUrl);
+                flyMap.attributionControl.setPrefix(lightAttribution);
+            }
+
+            setTimeout(() => flyMap.invalidateSize(), 10);
+        }
+
+        async function exitFlyMode() {
+            if (isPlanningTrip) {
+                toggleTripPlanning(); // Exit planning mode if active
+            }
+            stopFlight();
+            await releaseWakeLock();
+            flyModeScreen.classList.remove('show');
+            if (lastFlightData) {
+                showFlightSummary();
+            }
+        }
+
+        function toggleFlight() {
+            if (flightSimulationInterval || gpsWatchId) {
+                stopFlight();
+            } else {
+                startFlight();
+            }
+        }
+
+        function startFlight() {
+            if (isPlanningTrip) {
+                toggleTripPlanning(); // Auto-finish planning if user hits start
+            }
+            // Reset flight data
+            totalDistance = 0;
+            maxAltitude = 0;
+            maxSpeed = 0;
+            lastFlightData = null;
+            lastPosition = null;
+            lastHeading = 0;
+            initialAltitude = null;
+            hasTakenOff = false;
+            touchAndGoCount = 0;
+            if (landingTimer) clearTimeout(landingTimer);
+            landingTimer = null;
+            seaLevelPressure = null;
+
+            if (pilotMarker) flyMap.removeLayer(pilotMarker);
+            if (flightPathPolyline) flyMap.removeLayer(flightPathPolyline);
+
+            const startLatLng = flyMap.getCenter();
+            const pilotIcon = L.divIcon({ className: 'pilot-icon', html: '🪂', iconSize: [24, 24] });
+            pilotMarker = L.marker(startLatLng, { icon: pilotIcon, rotationAngle: 0 }).addTo(flyMap);
+            flightPathPolyline = L.polyline([startLatLng], { color: 'var(--accent-red)' }).addTo(flyMap);
+
+            flightStartTime = new Date();
+
+            // SENSOR INITIALIZATION
+            let altitudeSource = 'simulation'; // Default to simulation
+
+            // 1. Try Barometer first
+            if ('Barometer' in window) {
+                try {
+                    barometer = new Barometer({ frequency: 1 });
+                    barometer.addEventListener('reading', () => {
+                        if (seaLevelPressure === null) {
+                            seaLevelPressure = barometer.pressure; // Set base pressure on first reading
+                        }
+                        const currentPressure = barometer.pressure;
+                        const altitude = 44330 * (1 - Math.pow(currentPressure / seaLevelPressure, 1 / 5.255));
+                        updateFlightData({ altitude });
+                    });
+                    barometer.addEventListener('error', (event) => {
+                        console.error(event.error.name, event.error.message);
+                        showNotification('Barometer error. Using GPS altitude.', 'error');
+                        barometer = null; // Disable it
+                    });
+                    barometer.start();
+                    altitudeSource = 'barometer';
+                    showNotification('Barometer active for altitude.', 'success');
+                } catch (error) {
+                    console.error('Barometer could not be initialized.', error);
+                    barometer = null;
+                }
+            }
+
+            // 2. Try GPS for position and maybe altitude
+            if ('geolocation' in navigator) {
+                gpsWatchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const data = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            speed: position.coords.speed ? position.coords.speed * 3.6 : 0,
+                            heading: position.coords.heading
+                        };
+                        if (altitudeSource !== 'barometer') {
+                            data.altitude = position.coords.altitude || 0;
+                            if (initialAltitude === null && data.altitude > 0) {
+                                initialAltitude = data.altitude;
+                            }
+                        }
+                        updateFlightData(data);
+                    },
+                    (error) => {
+                        console.error("GPS Error:", error);
+                        if (!flightSimulationInterval) { // Only start sim if not already running
+                           showNotification("GPS error. Falling back to simulation.", "error");
+                           startSimulation();
+                        }
+                    },
+                    { enableHighAccuracy: true }
+                );
+            } else if (altitudeSource === 'simulation') {
+                // 3. Fallback to simulation if no GPS
+                startSimulation();
+            }
+            
+            function startSimulation() {
+                if (flightSimulationInterval) return;
+                showNotification("GPS not available. Starting simulation.", "info");
+                initialAltitude = 150; // Set a base for simulation
+                flightSimulationInterval = setInterval(simulateFlight, 2000);
+            }
+
+
+            fetchAirTraffic();
+            airTrafficInterval = setInterval(fetchAirTraffic, 10000);
+            
+            if (connectedAccount) {
+                fetchClubPilots();
+                clubTrafficInterval = setInterval(fetchClubPilots, 5000);
+            }
+
+            if (tripWaypoints.length > 0 && !tripWaypoints.every(wp => wp.reached)) {
+                currentWaypointIndex = tripWaypoints.findIndex(wp => !wp.reached);
+                if (currentWaypointIndex === -1) {
+                    tripWaypoints.forEach(wp => {
+                        wp.reached = false;
+                        wp.marker.getElement().classList.remove('reached');
+                    });
+                    currentWaypointIndex = 0;
+                }
+                compassContainer.style.display = 'flex';
+                updateTripUI();
+            }
+            
+            flightControls.classList.add('flight-active');
+            exitFlyModeBtn.style.display = 'flex';
+        }
+        
+        function handleMotionEvent(event) {
+            const { x, y, z } = event.accelerationIncludingGravity;
+            const gForce = Math.sqrt(x*x + y*y + z*z) / 9.81; // Normalize to g's
+            document.getElementById('flight-gforce').textContent = gForce.toFixed(1);
+        }
+
+        function updateRealFlightData(position) {
+            const { latitude, longitude, altitude, speed, heading } = position.coords;
+            const data = {
+                lat: latitude,
+                lng: longitude,
+                speed: speed ? speed * 3.6 : 0,
+                heading: heading
+            };
+            // Only update altitude from GPS if barometer isn't active
+            if (!barometer) {
+                data.altitude = altitude || 0;
+            }
+            updateFlightData(data);
+        }
+
+
+        function stopFlight() {
+            if (flightSimulationInterval) {
+                clearInterval(flightSimulationInterval);
+                flightSimulationInterval = null;
+            }
+            if(gpsWatchId) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null;
+            }
+            if (airTrafficInterval) {
+                clearInterval(airTrafficInterval);
+                airTrafficInterval = null;
+            }
+            if (landingTimer) {
+                clearTimeout(landingTimer);
+                landingTimer = null;
+            }
+            if (barometer) {
+                barometer.stop();
+                barometer = null;
+            }
+            
+            if (clubTrafficInterval) {
+                clearInterval(clubTrafficInterval);
+                clubTrafficInterval = null;
+            }
+            if (connectedAccount && mockPilotDatabase[connectedAccount]) {
+                mockPilotDatabase[connectedAccount].isFlying = false;
+            }
+            for (const name in clubPilotMarkers) {
+                flyMap.removeLayer(clubPilotMarkers[name]);
+                delete clubPilotMarkers[name];
+            }
+            clubPilotMarkers = {};
+
+            window.removeEventListener('devicemotion', handleMotionEvent);
+
+
+            for (const key in airTrafficMarkers) {
+                flyMap.removeLayer(airTrafficMarkers[key].marker);
+                if (airTrafficMarkers[key].circle) flyMap.removeLayer(airTrafficMarkers[key].circle);
+                delete airTrafficMarkers[key];
+            }
+            airTrafficMarkers = {};
+
+            const duration = flightStartTime ? Math.floor((new Date() - flightStartTime) / 1000) : 0;
+            if (duration > 10) { // Only save if flight was longer than 10 seconds
+                lastFlightData = {
+                    duration: duration,
+                    distance: totalDistance,
+                    maxAltitude: maxAltitude,
+                    maxSpeed: maxSpeed,
+                    touchAndGo: touchAndGoCount,
+                    date: new Date(),
+                    trip: tripWaypoints.length > 0 ? tripWaypoints.map(wp => ({lat: wp.latlng.lat, lng: wp.latlng.lng, reached: wp.reached})) : null
+                };
+            }
+            
+            resetTrip();
+
+            flightControls.classList.remove('flight-active');
+            // Do not hide exit button here, it's handled by exitFlyMode
+        }
+
+        function simulateFlight() {
+            const currentLatLng = pilotMarker.getLatLng();
+            const currentAltitude = parseFloat(document.getElementById('flight-altitude').textContent);
+
+            const newLat = currentLatLng.lat + (Math.random() - 0.5) * 0.002;
+            const newLng = currentLatLng.lng + (Math.random() - 0.5) * 0.002;
+            
+            const newAltitude = currentAltitude + (Math.random() - 0.45) * 10;
+            const newSpeed = 30 + (Math.random() - 0.5) * 15;
+            const gForce = 1.0 + (Math.random() * 0.5);
+
+            updateFlightData({
+                lat: newLat,
+                lng: newLng,
+                altitude: newAltitude,
+                speed: newSpeed,
+                gForce: gForce,
+                heading: null
+            });
+        }
+        
+        function updateFlightData(data) {
+            const { lat, lng, altitude, speed, gForce, heading } = data;
+            const currentLatLng = L.latLng(lat ?? lastPosition.lat, lng ?? lastPosition.lng);
+
+            if (lat !== undefined && lng !== undefined) {
+                 if (lastPosition && heading === null) {
+                    lastHeading = calculateBearing(lastPosition.lat, lastPosition.lng, currentLatLng.lat, currentLatLng.lng);
+                } else if (heading !== null) {
+                    lastHeading = heading;
+                }
+                pilotMarker.setLatLng(currentLatLng);
+                pilotMarker.setRotationAngle(lastHeading);
+                flightPathPolyline.addLatLng(currentLatLng);
+                flyMap.panTo(currentLatLng);
+
+                if (lastPosition) {
+                    totalDistance += lastPosition.distanceTo(currentLatLng) / 1000;
+                }
+                lastPosition = currentLatLng;
+                document.getElementById('flight-distance').textContent = totalDistance.toFixed(2);
+            }
+
+            if (speed !== undefined) {
+                if (speed > maxSpeed) maxSpeed = speed;
+                document.getElementById('flight-speed').textContent = speed.toFixed(1);
+            }
+
+            if (altitude !== undefined) {
+                const relativeAltitude = initialAltitude !== null ? altitude - initialAltitude : altitude;
+                if (relativeAltitude > maxAltitude) maxAltitude = relativeAltitude;
+                document.getElementById('flight-altitude').textContent = relativeAltitude.toFixed(0);
+                document.getElementById('flight-max-altitude').textContent = maxAltitude.toFixed(0);
+
+                if (initialAltitude !== null) {
+                    if (relativeAltitude > 5) hasTakenOff = true;
+                    if (hasTakenOff && relativeAltitude < 2) {
+                        if (!landingTimer) {
+                            landingTimer = setTimeout(() => {
+                                stopFlight();
+                                showFlightSummary();
+                            }, 5000);
+                        }
+                    } else if (hasTakenOff && relativeAltitude > 5) {
+                        if (landingTimer) {
+                            clearTimeout(landingTimer);
+                            landingTimer = null;
+                            touchAndGoCount++;
+                        }
+                    }
+                }
+            }
+
+            if(gForce) {
+                document.getElementById('flight-gforce').textContent = gForce.toFixed(1);
+            }
+
+            const now = new Date();
+            const duration = Math.floor((now - flightStartTime) / 1000);
+            const minutes = Math.floor(duration / 60).toString().padStart(2, '0');
+            const seconds = (duration % 60).toString().padStart(2, '0');
+            document.getElementById('flight-duration').textContent = `${minutes}:${seconds}`;
+            
+            checkWaypointArrival(currentLatLng);
+            updateCompass(currentLatLng, lastHeading);
+            
+            updateMyPositionInDatabase({lat: currentLatLng.lat, lng: currentLatLng.lng});
+        }
+
+
+        function showFlightSummary() {
+            const content = document.getElementById('flight-summary-content');
+            const minutes = Math.floor(lastFlightData.duration / 60);
+            const seconds = lastFlightData.duration % 60;
+            let summaryHTML = `
+                <p><strong>${translations[languageSelect.value].duration || 'Duration'}:</strong> ${minutes}m ${seconds}s</p>
+                <p><strong>${translations[languageSelect.value].distance || 'Distance'}:</strong> ${lastFlightData.distance.toFixed(2)} km</p>
+                <p><strong>${translations[languageSelect.value].max_altitude || 'Max Altitude'}:</strong> ${lastFlightData.maxAltitude.toFixed(0)} m</p>
+                <p><strong>${translations[languageSelect.value].speed || 'Max Speed'}:</strong> ${lastFlightData.maxSpeed.toFixed(1)} km/h</p>
+            `;
+            if (lastFlightData.touchAndGo > 0) {
+                summaryHTML += `<p><strong>Touch & Go:</strong> ${lastFlightData.touchAndGo}</p>`;
+            }
+            if (lastFlightData.trip) {
+                 summaryHTML += `<p><strong>${translations[languageSelect.value].trip_completed || 'Trip'}:</strong> ${lastFlightData.trip.length} waypoints</p>`;
+            }
+            content.innerHTML = summaryHTML;
+            flightSummaryModal.style.display = 'flex';
+        }
+
+        // --- TRIP PLANNER & SOCIAL FUNCTIONS ---
+        function toggleTripPlanning() {
+            isPlanningTrip = !isPlanningTrip;
+            const flyMapContainer = document.getElementById('fly-map');
+
+            if (isPlanningTrip) {
+                // --- ENTER PLANNING MODE ---
+                if (flightSimulationInterval || gpsWatchId) {
+                    showNotification("Cannot plan a trip while a flight is active.", "error");
+                    isPlanningTrip = false; // revert state
+                    return;
+                }
+                resetTrip(); // Clear any previous trip before starting a new one
+                programTripBtn.textContent = translations[languageSelect.value].finish_planning;
+                programTripBtn.style.backgroundColor = 'var(--accent-yellow)';
+                programTripBtn.style.boxShadow = '0 4px var(--accent-yellow-dark)';
+                flyMapContainer.classList.add('planning-mode');
+                flyMap.on('click', handleMapClickForWaypoint);
+                showNotification("Planning mode active. Click on the map to add waypoints.", "info");
+            } else {
+                // --- EXIT PLANNING MODE ---
+                programTripBtn.textContent = translations[languageSelect.value].program_trip;
+                programTripBtn.style.backgroundColor = 'var(--accent-blue)';
+                programTripBtn.style.boxShadow = '0 4px var(--accent-blue-dark)';
+                flyMapContainer.classList.remove('planning-mode');
+                flyMap.off('click', handleMapClickForWaypoint);
+                if (tripWaypoints.length > 0) {
+                    showNotification("Trip saved. Press 'Start Flight' to begin navigation.", "success");
+                }
+            }
+        }
+
+        function handleMapClickForWaypoint(e) {
+            if (!isPlanningTrip) return;
+
+            const latlng = e.latlng;
+            const waypointNumber = tripWaypoints.length + 1;
+
+            const waypointIcon = L.divIcon({
+                className: 'waypoint-icon',
+                html: `<span>${waypointNumber}</span>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
+            const marker = L.marker(latlng, { icon: waypointIcon }).addTo(flyMap);
+            const waypoint = {
+                latlng: latlng,
+                marker: marker,
+                reached: false
+            };
+            tripWaypoints.push(waypoint);
+            
+            updateTripUI();
+        }
+
+        function updateTripUI() {
+            tripPlannerPanel.style.display = tripWaypoints.length > 0 ? 'block' : 'none';
+            tripWaypointsList.innerHTML = '';
+
+            let totalTripDistance = 0;
+            for (let i = 0; i < tripWaypoints.length - 1; i++) {
+                totalTripDistance += tripWaypoints[i].latlng.distanceTo(tripWaypoints[i + 1].latlng);
+            }
+            totalTripDistance /= 1000; // Convert to km
+
+            tripWaypoints.forEach((wp, index) => {
+                const li = document.createElement('li');
+                li.textContent = `Waypoint ${index + 1}`;
+                if (wp.reached) {
+                    li.classList.add('reached');
+                    li.innerHTML += ' &check;';
+                }
+                if (index === currentWaypointIndex && !wp.reached) {
+                    li.classList.add('active');
+                }
+                tripWaypointsList.appendChild(li);
+            });
+            
+            // Add or update the total distance display
+            let distanceEl = document.getElementById('trip-total-distance');
+            if (!distanceEl) {
+                distanceEl = document.createElement('p');
+                distanceEl.id = 'trip-total-distance';
+                // Insert before the share button
+                const shareBtn = document.getElementById('shareTripBtn');
+                tripPlannerPanel.insertBefore(distanceEl, shareBtn);
+            }
+            
+            if (tripWaypoints.length > 1) {
+                 distanceEl.innerHTML = `<strong data-translate="total_distance">Total:</strong> ${totalTripDistance.toFixed(2)} km`;
+            } else {
+                 distanceEl.innerHTML = '';
+            }
+
+
+            // Draw path
+            if (tripPathPolyline) {
+                flyMap.removeLayer(tripPathPolyline);
+            }
+            const pathCoords = tripWaypoints.map(wp => wp.latlng);
+            tripPathPolyline = L.polyline(pathCoords, { color: 'var(--accent-blue)', dashArray: '5, 10' }).addTo(flyMap);
+        }
+
+        function checkWaypointArrival(currentLatLng) {
+            if (currentWaypointIndex === -1 || currentWaypointIndex >= tripWaypoints.length) return;
+
+            const targetWaypoint = tripWaypoints[currentWaypointIndex];
+            if (targetWaypoint.reached) return;
+
+            const distance = currentLatLng.distanceTo(targetWaypoint.latlng);
+
+            if (distance < REACH_THRESHOLD_METERS) {
+                targetWaypoint.reached = true;
+                targetWaypoint.marker.getElement().classList.add('reached');
+                showNotification(`Waypoint ${currentWaypointIndex + 1} reached!`, 'info');
+
+                // Move to next waypoint
+                currentWaypointIndex++;
+                if (currentWaypointIndex >= tripWaypoints.length) {
+                    // Trip finished
+                    showNotification("Trip completed!", 'success');
+                    compassContainer.style.display = 'none';
+                    currentWaypointIndex = -1; // End trip
+                }
+                updateTripUI();
+            }
+        }
+
+        function updateCompass(pilotLatLng, pilotHeading) {
+            if (currentWaypointIndex === -1 || currentWaypointIndex >= tripWaypoints.length) {
+                compassContainer.style.display = 'none';
+                return;
+            }
+            compassContainer.style.display = 'flex';
+            
+            const targetWaypoint = tripWaypoints[currentWaypointIndex];
+            const bearing = calculateBearing(pilotLatLng.lat, pilotLatLng.lng, targetWaypoint.latlng.lat, targetWaypoint.latlng.lng);
+            
+            const rotation = bearing - pilotHeading;
+            compassArrow.style.transform = `rotate(${rotation}deg)`;
+        }
+        
+        function resetTrip() {
+            if (flyMap) {
+                tripWaypoints.forEach(wp => flyMap.removeLayer(wp.marker));
+                if (tripPathPolyline) flyMap.removeLayer(tripPathPolyline);
+            }
+            tripWaypoints = [];
+            currentWaypointIndex = -1;
+            tripPlannerPanel.style.display = 'none';
+            compassContainer.style.display = 'none';
+        }
+
+        function generateShareableLink() {
+            if (tripWaypoints.length === 0) {
+                showNotification("Plan a trip first before sharing!", "error");
+                return;
+            }
+
+            const waypointsString = tripWaypoints.map(wp => `${wp.latlng.lat.toFixed(5)},${wp.latlng.lng.toFixed(5)}`).join(';');
+            const encodedTrip = btoa(waypointsString); // Base64 encode
+            
+            const url = new URL(window.location.href);
+            url.searchParams.set('trip', encodedTrip);
+
+            document.getElementById('share-trip-id-input').value = url.href;
+            shareTripModal.style.display = 'flex';
+        }
+
+        function checkForSharedTripOnLoad() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tripData = urlParams.get('trip');
+
+            if (tripData) {
+                try {
+                    const decodedString = atob(tripData);
+                    const waypointPairs = decodedString.split(';');
+                    
+                    enterFlyMode(); // Enter fly mode to show the map
+
+                    setTimeout(() => { // Wait for flyMap to initialize
+                        resetTrip();
+                        waypointPairs.forEach((pair, index) => {
+                            const coords = pair.split(',');
+                            const lat = parseFloat(coords[0]);
+                            const lng = parseFloat(coords[1]);
+                            
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                const waypointNumber = index + 1;
+                                const waypointIcon = L.divIcon({
+                                    className: 'waypoint-icon',
+                                    html: `<span>${waypointNumber}</span>`,
+                                    iconSize: [24, 24],
+                                    iconAnchor: [12, 12]
+                                });
+                                const marker = L.marker([lat, lng], { icon: waypointIcon }).addTo(flyMap);
+                                tripWaypoints.push({
+                                    latlng: L.latLng(lat, lng),
+                                    marker: marker,
+                                    reached: false
+                                });
+                            }
+                        });
+                        
+                        if (tripWaypoints.length > 0) {
+                            updateTripUI();
+                            flyMap.fitBounds(tripPathPolyline.getBounds(), { padding: [50, 50] });
+                            showNotification("Shared trip loaded!", "success");
+                        }
+                    }, 500); // 500ms delay to ensure map is ready
+
+                } catch (e) {
+                    console.error("Failed to decode trip data from URL", e);
+                    showNotification("Invalid trip data in URL.", "error");
+                }
+            }
+        }
+
+
+        function copyTripIdToClipboard() {
+            const input = document.getElementById('share-trip-id-input');
+            input.select();
+            input.setSelectionRange(0, 99999); // For mobile devices
+            try {
+                // A more robust way to copy that works in sandboxed environments
+                const successful = document.execCommand('copy');
+                const msg = successful ? 'Copied to clipboard!' : 'Could not copy.';
+                showNotification(msg, successful ? 'success' : 'error');
+            } catch (err) {
+                showNotification('Could not copy.', 'error');
+            }
+        }
+
+        // --- NEW: CLUB / SOCIAL FLYING FUNCTIONS ---
+        function updateMyPositionInDatabase(data) {
+            if (!connectedAccount) return; 
+
+            const currentClubId = getCurrentClubId();
+            if (!currentClubId) return; 
+
+            mockPilotDatabase[connectedAccount] = {
+                lat: data.lat,
+                lng: data.lng,
+                heading: lastHeading,
+                name: pilotProfile.name,
+                clubId: currentClubId,
+                isFlying: true,
+                timestamp: Date.now()
+            };
+        }
+
+        function fetchClubPilots() {
+            const currentClubId = getCurrentClubId();
+            if (!currentClubId || !connectedAccount) {
+                updateClubPilotsOnMap([]); // Clear map if not in a club
+                return;
+            }
+
+            const otherPilots = [];
+            const now = Date.now();
+
+            for (const pilotId in mockPilotDatabase) {
+                const pilotData = mockPilotDatabase[pilotId];
+                // Don't show myself, must be in the same club, must be flying, and data must be recent (e.g., within last 2 minutes)
+                if (pilotId !== connectedAccount &&
+                    pilotData.clubId === currentClubId &&
+                    pilotData.isFlying &&
+                    (now - pilotData.timestamp < 120000)
+                   ) {
+                    otherPilots.push(pilotData);
+                }
+            }
+            updateClubPilotsOnMap(otherPilots);
+        }
+
+        function updateClubPilotsOnMap(pilots) {
+            const updatedNames = new Set();
+            const clubPilotIcon = L.divIcon({ className: 'club-pilot-icon', html: '🪂', iconSize: [24, 24] });
+
+            pilots.forEach(pilot => {
+                const pilotName = pilot.name;
+                updatedNames.add(pilotName);
+
+                if (clubPilotMarkers[pilotName]) {
+                    // Update existing marker
+                    clubPilotMarkers[pilotName].setLatLng([pilot.lat, pilot.lng]);
+                    clubPilotMarkers[pilotName].setRotationAngle(pilot.heading);
+                } else {
+                    // Create new marker
+                    const marker = L.marker([pilot.lat, pilot.lng], {
+                        icon: clubPilotIcon,
+                        rotationAngle: pilot.heading
+                    }).addTo(flyMap);
+                    marker.bindTooltip(pilotName, { permanent: true, direction: 'right', className: 'club-pilot-tooltip' });
+                    clubPilotMarkers[pilotName] = marker;
+                }
+            });
+
+            // Remove pilots who are no longer flying
+            for (const name in clubPilotMarkers) {
+                if (!updatedNames.has(name)) {
+                    flyMap.removeLayer(clubPilotMarkers[name]);
+                    delete clubPilotMarkers[name];
+                }
+            }
+        }
+
+        function getCurrentClubId() {
+            // Find the first club the user has joined (or is awaiting approval for)
+            const clubKeys = Object.keys(localStorage).filter(k => k.startsWith('flylog_club_status_'));
+            const joinedClubKey = clubKeys.find(k => localStorage.getItem(k) === 'awaiting');
+            return joinedClubKey ? joinedClubKey.replace('flylog_club_status_', '') : null;
+        }
+
+
+        // --- LOG MODE ---
+        function enterLogMode(flightData = null) {
+            logModeScreen.classList.add('show');
+            const statsContainer = document.getElementById('new-log-stats');
+            const commentsArea = document.getElementById('log-comments');
+            commentsArea.value = '';
+            statsContainer.innerHTML = '';
+
+            if (flightData) {
+                const minutes = Math.floor(flightData.duration / 60);
+                const seconds = flightData.duration % 60;
+                statsContainer.innerHTML = `
+                    <p><strong>Flight on ${flightData.date.toLocaleDateString()}:</strong> 
+                    ${minutes}m ${seconds}s, 
+                    ${flightData.distance.toFixed(2)} km, 
+                    ${flightData.maxAltitude.toFixed(0)}m max alt</p>
+                `;
+                if (flightData.trip) {
+                    statsContainer.innerHTML += `<p><strong>Trip:</strong> ${flightData.trip.length} waypoints planned.</p>`
+                }
+            }
+        }
+
+        function exitLogMode() {
+            logModeScreen.classList.remove('show');
+            lastFlightData = null;
+        }
+
+        async function saveLog() {
+            // Save locally first
+            const comments = document.getElementById('log-comments').value;
+            const newLog = {
+                id: Date.now(),
+                comments: comments,
+                flightData: lastFlightData,
+                logDate: new Date(),
+                isPublic: false 
+            };
+            flightLogs.unshift(newLog);
+            localStorage.setItem(`flylog_logs_${connectedAccount}`, JSON.stringify(flightLogs));
+            displayPastLogs();
+            
+            // Then, save on-chain if possible
+            if (lastFlightData && pilotOnChainProfile.isRegistered) {
+                await saveLogOnChain(lastFlightData);
+            }
+
+            exitLogMode();
+            showNotification('Log saved locally!', 'success');
+        }
+
+        function displayPastLogs() {
+            pastLogsList.innerHTML = '';
+            if (flightLogs.length === 0) {
+                pastLogsList.innerHTML = '<li>No local logs yet. Go for a flight!</li>';
+                return;
+            }
+
+            flightLogs.forEach((log) => {
+                const li = document.createElement('li');
+                li.className = 'log-entry';
+                let statsHtml = 'Manual Log Entry';
+                if (log.flightData) {
+                    const fd = log.flightData;
+                    const minutes = Math.floor(fd.duration / 60);
+                    const seconds = fd.duration % 60;
+                    statsHtml = `
+                        Duration: ${minutes}m ${seconds}s | 
+                        Distance: ${fd.distance.toFixed(2)} km | 
+                        Max Alt: ${fd.maxAltitude.toFixed(0)}m
+                    `;
+                    if (fd.trip) {
+                        statsHtml += ` | Trip: ${fd.trip.length} WPs`;
+                    }
+                }
+                const isPublicText = log.isPublic ? translations[languageSelect.value].make_private : translations[languageSelect.value].make_public;
+                li.innerHTML = `
+                    <div>
+                        <div class="log-entry-header">${new Date(log.logDate).toLocaleString()}</div>
+                        <div class="log-entry-stats">${statsHtml}</div>
+                        <p>${log.comments.replace(/\n/g, '<br>')}</p>
+                    </div>
+                    <div class="log-actions">
+                         <button class="sidebar-btn sidebar-btn-secondary" style="font-size: 0.7rem; padding: 5px 8px;" onclick="toggleLogPrivacy(${log.id})">${isPublicText}</button>
+                         <button class="delete-log-btn" onclick="deleteLog(${log.id})">&times;</button>
+                    </div>
+                `;
+                pastLogsList.appendChild(li);
+            });
+        }
+        
+        function deleteLog(logId) {
+            flightLogs = flightLogs.filter(log => log.id !== logId);
+            localStorage.setItem(`flylog_logs_${connectedAccount}`, JSON.stringify(flightLogs));
+            displayPastLogs();
+        }
+
+        function toggleLogPrivacy(logId) {
+            const logIndex = flightLogs.findIndex(log => log.id === logId);
+            if (logIndex > -1) {
+                flightLogs[logIndex].isPublic = !flightLogs[logIndex].isPublic;
+                localStorage.setItem(`flylog_logs_${connectedAccount}`, JSON.stringify(flightLogs));
+                displayPastLogs();
+                const message = flightLogs[logIndex].isPublic ? 'Log is now public.' : 'Log is now private.';
+                showNotification(message, 'success');
+            }
+        }
+
+        // --- BREVET & ON-CHAIN FUNCTIONS ---
+        async function enterBrevetMode() {
+            if (!connectedAccount) {
+                showNotification("Please connect your wallet to view your Brevet.", "error");
+                return;
+            }
+            renderBrevet(); // Render with local data first
+            brevetModeScreen.classList.add('show');
+            await loadOnChainProfile(); // Then refresh with latest on-chain data
+        }
+
+        function exitBrevetMode() {
+            brevetModeScreen.classList.remove('show');
+        }
+
+        function renderBrevet() {
+            brevetPilotName.textContent = pilotProfile.name;
+            brevetWalletAddress.textContent = connectedAccount;
+
+            if (pilotOnChainProfile.isCertified) {
+                brevetCertificationBadge.style.display = 'inline-block';
+            } else {
+                brevetCertificationBadge.style.display = 'none';
+            }
+
+            if (pilotProfile.photo) {
+                brevetProfilePic.style.backgroundImage = `url(${pilotProfile.photo})`;
+            } else {
+                brevetProfilePic.style.backgroundImage = `url('https://placehold.co/120x120/5D3FD3/FFFFFF?text=${pilotProfile.name.charAt(0)}')`;
+            }
+        }
+        
+        function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    pilotProfile.photo = e.target.result;
+                    savePilotProfile(); // Saves to local storage
+                    renderBrevet(); // Re-render with new photo
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        function generateBrevetLink() {
+            if (!connectedAccount) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('brevet', connectedAccount);
+            document.getElementById('share-trip-id-input').value = url.href; // Reuse existing modal
+            shareTripModal.querySelector('h2').textContent = "Share Brevet";
+            shareTripModal.style.display = 'flex';
+        }
+
+        async function checkForSharedBrevet() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const brevetAddress = urlParams.get('brevet');
+            if (brevetAddress && ethers.isAddress(brevetAddress)) {
+                // Fetch and display public on-chain data for this address
+                showNotification(`Loading public brevet for ${brevetAddress.substring(0,6)}...`, 'info');
+                const readonlyContract = new ethers.Contract(contractAddress, contractABI, provider);
+                try {
+                    const pilotData = await readonlyContract.pilots(brevetAddress);
+                    const isCertified = await readonlyContract.isCertified(brevetAddress);
+                    
+                    if(!pilotData.isRegistered) {
+                        showNotification("This pilot is not registered on-chain.", "error");
+                        return;
+                    }
+                    
+                    const flightCount = await readonlyContract.getFlightCount(brevetAddress);
+                    let logs = [];
+                    for(let i = 0; i < flightCount; i++) {
+                        const log = await readonlyContract.flightLogs(brevetAddress, i);
+                        logs.push(log);
+                    }
+
+                    // We don't have local profile data, so we create a mock object for rendering
+                    const publicBrevetData = {
+                        name: pilotData.name,
+                        address: brevetAddress,
+                        photo: null, // Public profiles don't show photos from local storage
+                        isCertified: isCertified,
+                        logs: logs
+                    };
+                    renderPublicBrevet(publicBrevetData);
+                    
+                } catch(e) {
+                    console.error("Could not fetch public brevet", e);
+                    showNotification("Could not fetch public brevet data.", "error");
+                }
+            }
+        }
+
+        function renderPublicBrevet(data) {
+             brevetPilotName.textContent = data.name;
+             brevetWalletAddress.textContent = data.address;
+             if (data.isCertified) {
+                brevetCertificationBadge.style.display = 'inline-block';
+            } else {
+                brevetCertificationBadge.style.display = 'none';
+            }
+             brevetProfilePic.style.backgroundImage = `url('https://placehold.co/120x120/5D3FD3/FFFFFF?text=${data.name.charAt(0)}')`;
+             onchainLogsList.innerHTML = '';
+             if (data.logs.length === 0) {
+                 onchainLogsList.innerHTML = `<li>No on-chain flights logged.</li>`;
+             } else {
+                 data.logs.forEach(log => {
+                     const li = document.createElement('li');
+                     li.className = 'log-entry';
+                     const date = new Date(Number(log.timestamp) * 1000);
+                     const duration = Number(log.duration);
+                     const distance = Number(log.distance);
+                     li.innerHTML = `
+                        <div>
+                            <div class="log-entry-header">${date.toLocaleString()}</div>
+                            <div class="log-entry-stats">
+                                Duration: ${Math.floor(duration/60)}m ${duration%60}s | 
+                                Distance: ${(distance/1000).toFixed(2)} km
+                            </div>
+                        </div>`;
+                     onchainLogsList.appendChild(li);
+                 });
+             }
+             brevetModeScreen.classList.add('show');
+        }
+        
+        async function loadOnChainProfile() {
+            if (!connectedAccount || !brevetContract) return;
+            try {
+                const pilotData = await brevetContract.pilots(connectedAccount);
+                const isCertified = await brevetContract.isCertified(connectedAccount);
+
+                pilotOnChainProfile.isRegistered = pilotData.isRegistered;
+                pilotOnChainProfile.name = pilotData.name;
+                pilotOnChainProfile.isCertified = isCertified;
+
+                if (pilotOnChainProfile.isRegistered) {
+                    onchainStatus.textContent = `Registered as "${pilotOnChainProfile.name}". Certified: ${isCertified ? 'Yes' : 'No'}.`;
+                    registerPilotBtn.style.display = 'none';
+                } else {
+                    onchainStatus.textContent = "Your profile is not registered on the blockchain. Register to save flights on-chain.";
+                    registerPilotBtn.style.display = 'block';
+                }
+                
+                // Sync local name with on-chain name if it exists
+                if(pilotOnChainProfile.isRegistered && pilotOnChainProfile.name !== pilotProfile.name) {
+                    pilotProfile.name = pilotOnChainProfile.name;
+                    pilotNameInput.value = pilotProfile.name;
+                    savePilotProfile();
+                }
+
+                renderBrevet();
+                await fetchOnChainLogs();
+                await updateBalanceDisplay();
+
+            } catch (e) {
+                console.error("Could not fetch on-chain profile", e);
+                onchainStatus.textContent = "Error fetching on-chain data. Is the contract deployed on the correct network?";
+            }
+        }
+
+        async function fetchOnChainLogs() {
+            if (!pilotOnChainProfile.isRegistered) {
+                onchainLogsList.innerHTML = '<li>Register your profile to see on-chain logs.</li>';
+                return;
+            }
+            try {
+                const flightCount = await brevetContract.getFlightCount(connectedAccount);
+                onchainLogsList.innerHTML = ''; // Clear list
+                if (flightCount === 0n) {
+                    onchainLogsList.innerHTML = '<li>No flights logged on-chain yet.</li>';
+                    return;
+                }
+
+                for (let i = 0; i < flightCount; i++) {
+                    const log = await brevetContract.flightLogs(connectedAccount, i);
+                    const li = document.createElement('li');
+                    li.className = 'log-entry';
+                    const date = new Date(Number(log.timestamp) * 1000);
+                    const duration = Number(log.duration);
+                    const distance = Number(log.distance);
+                    li.innerHTML = `
+                        <div>
+                            <div class="log-entry-header">${date.toLocaleString()}</div>
+                            <div class="log-entry-stats">
+                                Duration: ${Math.floor(duration/60)}m ${duration%60}s | 
+                                Distance: ${(distance/1000).toFixed(2)} km
+                            </div>
+                        </div>`;
+                    onchainLogsList.prepend(li); // Show newest first
+                }
+            } catch(e) {
+                console.error("Could not fetch on-chain logs", e);
+                onchainLogsList.innerHTML = '<li>Error fetching on-chain logs.</li>';
+            }
+        }
+
+        async function registerPilotOnChain() {
+            if (!signer) {
+                showNotification("Please connect your wallet first.", "error");
+                return;
+            }
+            // In a real dApp, this function would likely only be callable by an 'attester' address.
+            // For this demo, we'll let the user register themselves.
+            // A better approach would be: an authorized club owner calls `registerPilot(pilotAddress, pilotName)`.
+            // Here, we'll simulate an attester call for demonstration.
+            showNotification("Mint pilt brevet...", "info", 0);
+            try {
+                // NOTE: This assumes the connected signer is an AUTHORIZED ATTESTER for demo purposes.
+                const tx = await brevetContract.registerPilot(connectedAccount, pilotProfile.name);
+                showNotification("Transaction sent... waiting for confirmation.", "info", 0);
+                await tx.wait();
+                hideNotification();
+                showNotification("Pilot registered on-chain successfully!", "success");
+                await loadOnChainProfile();
+            } catch (e) {
+                console.error("Registration failed", e);
+                showNotification(`Registration failed: ${e.reason || e.message}`, "error");
+            }
+        }
+        
+        async function updateProfileOnChain() {
+             if (!pilotOnChainProfile.isRegistered) {
+                showNotification("You must register your profile before updating it.", "error");
+                return;
+            }
+            const newName = pilotNameInput.value.trim();
+            if(!newName || newName === pilotOnChainProfile.name) {
+                showNotification("Please enter a new name.", "info");
+                return;
+            }
+             showNotification("Sending profile update transaction...", "info", 0);
+            try {
+                const tx = await brevetContract.updateProfile(newName);
+                await tx.wait();
+                hideNotification();
+                showNotification("Profile updated on-chain!", "success");
+                await loadOnChainProfile();
+            } catch (e) {
+                console.error("Profile update failed", e);
+                showNotification(`Update failed: ${e.reason || e.message}`, "error");
+            }
+        }
+        
+        async function saveLogOnChain(flightData) {
+            const duration = Math.round(flightData.duration);
+            const distance = Math.round(flightData.distance * 1000); // Convert km to meters
+
+            showNotification("Sending flight log to the blockchain...", "info", 0);
+             try {
+                const tx = await brevetContract.logFlight(duration, distance);
+                await tx.wait();
+                hideNotification();
+                showNotification("Flight successfully logged on-chain!", "success");
+                await fetchOnChainLogs();
+            } catch (e) {
+                console.error("On-chain log failed", e);
+                showNotification(`On-chain log failed: ${e.reason || e.message}`, "error");
+            }
+        }
+        
+        async function updateBalanceDisplay() {
+            if (!connectedAccount || !provider) return;
+            try {
+                const balanceWei = await provider.getBalance(connectedAccount);
+                const balanceEth = ethers.formatEther(balanceWei);
+                if (brevetWalletBalance) {
+                     brevetWalletBalance.textContent = `Balance: ${parseFloat(balanceEth).toFixed(5)} ETH`;
+                }
+            } catch (error) {
+                console.error("Could not fetch balance:", error);
+                if (brevetWalletBalance) {
+                     brevetWalletBalance.textContent = "Balance: Error";
+                }
+            }
+        }
+
+        // --- DATA FETCHING & PROCESSING ---
+        async function loadWindForecast() {
+            const { lat, lon } = zonaActual;
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,temperature_2m,dew_point_2m&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,wind_gusts_10m_max&timezone=auto`;
+
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const data = await res.json();
+
+                windData = data.hourly;
+                dailyData = data.daily;
+
+                hourSelect.innerHTML = '';
+                windData.time.forEach((h, i) => {
+                    const opt = document.createElement("option");
+                    opt.value = i;
+                    opt.textContent = new Date(h).toLocaleString('es-AR', { timeStyle: 'short', dateStyle: 'short' });
+                    hourSelect.appendChild(opt);
+                });
+
+                const indexActual = findCurrentHourIndex();
+                hourSelect.value = indexActual;
+
+                renderWindLayer(indexActual);
+                updateMapTheme();
+                const resumenSemanal = generarResumenSemanal(dailyData);
+                mostrarResumenSemanal(resumenSemanal);
+                globalResumenHorario = generarResumenHorario(windData, dailyData);
+                mostrarGraficoViento(globalResumenHorario);
+
+            } catch (error) {
+                console.error("Error fetching wind data:", error);
+                showNotification("Failed to fetch forecast. Check connection.");
+            }
+        }
+
+        async function fetchAirTraffic() {
+            if (!flyMap || !pilotMarker) return;
+            const bounds = flyMap.getBounds();
+            const url = `https://opensky-network.org/api/states/all?lamin=${bounds.getSouth()}&lomin=${bounds.getWest()}&lamax=${bounds.getNorth()}&lomax=${bounds.getEast()}`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`OpenSky API error! status: ${response.status}`);
+                const data = await response.json();
+                if (data.states) {
+                    updateAirTrafficOnMap(data.states);
+                    checkProximityAlerts(data.states);
+                }
+            } catch (error) {
+                console.error("Could not fetch air traffic:", error);
+            }
+        }
+
+        function updateAirTrafficOnMap(states) {
+            const updatedIcaos = new Set();
+            const aircraftIcon = L.divIcon({ className: 'aircraft-icon', html: '✈️', iconSize: [24, 24] });
+
+            states.forEach(state => {
+                const icao24 = state[0];
+                const lat = state[6];
+                const lon = state[5];
+                const track = state[10];
+
+                if (!lat || !lon) return;
+
+                updatedIcaos.add(icao24);
+
+                if (airTrafficMarkers[icao24]) {
+                    airTrafficMarkers[icao24].marker.setLatLng([lat, lon]);
+                    airTrafficMarkers[icao24].marker.setRotationAngle(track);
+                    if(airTrafficMarkers[icao24].circle) airTrafficMarkers[icao24].circle.setLatLng([lat, lon]);
+
+                } else {
+                    const marker = L.marker([lat, lon], {
+                        icon: aircraftIcon,
+                        rotationAngle: track
+                    }).addTo(flyMap);
+                    marker.bindTooltip(state[1] || 'N/A', { permanent: false, direction: 'top', offset: [0, -10] });
+                    const circle = L.circle([lat, lon], {
+                        radius: ALERT_RADIUS_METERS,
+                        color: 'grey',
+                        fillColor: 'grey',
+                        fillOpacity: 0.1,
+                        weight: 1
+                    }).addTo(flyMap);
+                    airTrafficMarkers[icao24] = { marker, circle };
+                }
+            });
+
+            for (const icao in airTrafficMarkers) {
+                if (!updatedIcaos.has(icao)) {
+                    flyMap.removeLayer(airTrafficMarkers[icao].marker);
+                    if (airTrafficMarkers[icao].circle) flyMap.removeLayer(airTrafficMarkers[icao].circle);
+                    delete airTrafficMarkers[icao];
+                }
+            }
+        }
+
+        function checkProximityAlerts(states) {
+            if (!pilotMarker) return;
+            const pilotLatLng = pilotMarker.getLatLng();
+            let isAlert = false;
+
+            for (const state of states) {
+                const lat = state[6];
+                const lon = state[5];
+                if (!lat || !lon) continue;
+
+                const aircraftLatLng = L.latLng(lat, lon);
+                const distance = pilotLatLng.distanceTo(aircraftLatLng);
+
+                if (distance < ALERT_RADIUS_METERS) {
+                    showTrafficAlert(state);
+                    isAlert = true;
+                    break;
+                }
+            }
+            if (!isAlert) {
+                flyModeScreen.classList.remove('traffic-alert-active');
+            }
+        }
+
+        function findCurrentHourIndex() {
+            if (!windData || !windData.time) return 0;
+            const now = new Date();
+            let closestIndex = 0;
+            let minDiff = Infinity;
+
+            windData.time.forEach((timeStr, i) => {
+                const forecastTime = new Date(timeStr);
+                const diff = Math.abs(now - forecastTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = i;
+                }
+            });
+            return closestIndex;
+        }
+
+        // --- UI RENDERING FUNCTIONS ---
+        function renderWindLayer(index) {
+            if (!windData) return;
+            const speed = windData.wind_speed_10m[index];
+            const dir = windData.wind_direction_10m[index];
+            const gust = windData.wind_gusts_10m[index];
+            const { lat, lon } = zonaActual;
+
+            updateAnemometer(speed, dir, gust);
+
+            const u = -speed * Math.sin(dir * Math.PI / 180);
+            const v = -speed * Math.cos(dir * Math.PI / 180);
+
+            const gridSize = 10;
+            const gridStep = 0.1;
+            const numPoints = gridSize * gridSize;
+
+            const uData = Array(numPoints).fill(u);
+            const vData = Array(numPoints).fill(v);
+
+            const velocityData = [
+                {
+                    header: {
+                        parameterCategory: 2, parameterNumber: 2, refTime: new Date().toISOString(),
+                        nx: gridSize, ny: gridSize, lo1: lon - (gridSize / 2) * gridStep,
+                        la1: lat + (gridSize / 2) * gridStep, dx: gridStep, dy: gridStep,
+                    },
+                    data: uData
+                },
+                {
+                    header: {
+                        parameterCategory: 2, parameterNumber: 3, refTime: new Date().toISOString(),
+                        nx: gridSize, ny: gridSize, lo1: lon - (gridSize / 2) * gridStep,
+                        la1: lat + (gridSize / 2) * gridStep, dx: gridStep, dy: gridStep,
+                    },
+                    data: vData
+                }
+            ];
+
+            if (velocityLayer) {
+                velocityLayer.setData(velocityData);
+                return;
+            }
+
+            velocityLayer = L.velocityLayer({
+                displayValues: false,
+                data: velocityData, maxVelocity: 35, particleMultiplier: 1 / 100,
+                colorScale: ["#5D3FD3", "#e74c3c"]
+            });
+
+            velocityLayer.addTo(map);
+        }
+
+        function updateAnemometer(speed, direction, gust) {
+            const flecha = document.getElementById("flechaGrupo");
+            const textoVelocidad = document.getElementById("velocidadTexto");
+            const gustsTexto = document.getElementById("gustsTexto");
+            const arrowPolygon = flecha.querySelector("polygon");
+
+            flecha.setAttribute("transform", `rotate(${direction}, 100, 100)`);
+            textoVelocidad.textContent = `${speed.toFixed(1)} km/h`;
+            
+            if (gust !== undefined && gust !== null) {
+                gustsTexto.textContent = `Gusts: ${gust.toFixed(1)}`;
+                gustsTexto.style.display = 'block';
+            } else {
+                gustsTexto.style.display = 'none';
+            }
+
+            arrowPolygon.setAttribute("fill", getColorPorVelocidad(speed, true));
+        }
+
+        function updateMapTheme() {
+            if (!windData || !dailyData) return;
+
+            const selectedIndex = parseInt(hourSelect.value);
+            const selectedTime = new Date(windData.time[selectedIndex]);
+            const dayStr = selectedTime.toISOString().split('T')[0];
+
+            const dayIndex = dailyData.time.indexOf(dayStr);
+            if (dayIndex === -1) return;
+
+            const sunrise = new Date(dailyData.sunrise[dayIndex]);
+            const sunset = new Date(dailyData.sunset[dayIndex]);
+
+            const isDay = selectedTime >= sunrise && selectedTime <= sunset;
+            const newTheme = isDay ? 'light' : 'dark';
+
+            if (newTheme === currentMapTheme) return;
+            currentMapTheme = newTheme;
+
+            const lightUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+            const lightAttribution = '&copy; OpenStreetMap contributors';
+            const darkUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            const darkAttribution = '&copy; OpenStreetMap contributors &copy; CARTO';
+
+            const newUrl = isDay ? lightUrl : darkUrl;
+            const newAttribution = isDay ? lightAttribution : darkAttribution;
+
+            if (mapTileLayer) {
+                mapTileLayer.setUrl(newUrl);
+                map.attributionControl.setPrefix(newAttribution);
+            }
+        }
+
+        function getDailyCloudBase(fechaDia) {
+            if (!windData) return { base: 0 };
+            
+            let tempSum = 0, dewSum = 0, count = 0;
+
+            for (let i = 0; i < windData.time.length; i++) {
+                const date = new Date(windData.time[i]);
+                if (date.toLocaleDateString("en-CA") === fechaDia) {
+                    const daylightWindow = getDaylightWindow(fechaDia, dailyData);
+                    if (daylightWindow && date.getHours() >= daylightWindow.startHour && date.getHours() < daylightWindow.endHour) {
+                        tempSum += windData.temperature_2m[i];
+                        dewSum += windData.dew_point_2m[i];
+                        count++;
+                    }
+                }
+            }
+            if (count === 0) return { base: 0 };
+            
+            const avgTemp = tempSum / count;
+            const avgDew = dewSum / count;
+            const diff = avgTemp - avgDew;
+            const base = Math.round((diff) * 125);
+
+            return { base };
+        }
+
+
+        function getDailyWindStats(fechaDia) {
+            if (!windData) return { min: 0, max: 0, maxGust: 0 };
+            
+            const speeds = [];
+            const gusts = [];
+            const directions = [];
+
+            for (let i = 0; i < windData.time.length; i++) {
+                const date = new Date(windData.time[i]);
+                if (date.toLocaleDateString("en-CA") === fechaDia) {
+                    const daylightWindow = getDaylightWindow(fechaDia, dailyData);
+                    if (daylightWindow && date.getHours() >= daylightWindow.startHour && date.getHours() < daylightWindow.endHour) {
+                        speeds.push(windData.wind_speed_10m[i]);
+                        gusts.push(windData.wind_gusts_10m[i]);
+                        directions.push(windData.wind_direction_10m[i]);
+                    }
+                }
+            }
+            if (speeds.length === 0) return { min: 0, max: 0, maxGust: 0, directions: [] };
+            return { 
+                min: Math.min(...speeds).toFixed(1), 
+                max: Math.max(...speeds).toFixed(1),
+                maxGust: Math.max(...gusts).toFixed(1),
+                directions: directions
+            };
+        }
+
+        function getDailyPrecipitation(fechaDia) {
+            if (!windData) return false;
+            
+            for (let i = 0; i < windData.time.length; i++) {
+                const date = new Date(windData.time[i]);
+                if (date.toLocaleDateString("en-CA") === fechaDia) {
+                    const daylightWindow = getDaylightWindow(fechaDia, dailyData);
+                    if (daylightWindow && date.getHours() >= daylightWindow.startHour && date.getHours() < daylightWindow.endHour) {
+                        if (windData.precipitation[i] > 0) {
+                            return true; // Found rain, no need to check further
+                        }
+                    }
+                }
+            }
+            return false; // No rain found during daylight hours
+        }
+
+
+        function mostrarResumenSemanal(resumen) {
+            const contenedor = document.getElementById("resumenSemanal");
+            const currentLang = languageSelect.value || 'en';
+            const locale = { en: 'en-US', es: 'es-AR', fr: 'fr-FR' }[currentLang];
+            let html = `<h4>${translations[currentLang].flyable_days_title || 'Flyable Days'}</h4>`;
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+
+            resumen.forEach(dia => {
+                const fechaDia = new Date(dia.fecha + 'T00:00:00');
+                if (fechaDia < hoy) return;
+
+                const windStats = getDailyWindStats(dia.fecha);
+                const cloudBaseInfo = getDailyCloudBase(dia.fecha);
+                const hasRain = getDailyPrecipitation(dia.fecha);
+                const maxWind = parseFloat(windStats.max);
+                const maxGust = parseFloat(windStats.maxGust);
+
+                let icon = '✅'; // Default good
+
+                if (hasRain) {
+                    icon = '🌧️';
+                } else if (maxWind > 45) {
+                    icon = '💀';
+                } else if (maxWind > 20) {
+                    icon = '🔴';
+                } else if (maxWind > 15) {
+                    icon = '🟠';
+                } else if (maxGust > 25) {
+                // } else if (maxGust > 20) {
+                    icon = '🟡';
+                }
+
+                const diaTexto = fechaDia.toDateString() === hoy.toDateString() ? translations[currentLang].today : dia.dia;
+                
+                const windDirectionSummary = getWindDirectionSummary(windStats.directions);
+
+                html += `
+                <div class="accordion">
+                    <div class="accordion-item">
+                    <button class="accordion-header" data-date="${dia.fecha}">${icon} ${diaTexto}</button>
+                    <div class="accordion-body">
+                        <p>🌬️ Wind: ${windStats.min} - ${windStats.max} km/h</p>
+                        <p>💨 Max Gusts: ${windStats.maxGust} km/h</p>
+                        <p>➡️ Direction: ${windDirectionSummary}</p>
+                        <p>☁️ ${translations[currentLang].cloud_base || 'Cloud Base'}: ${cloudBaseInfo.base}m</p>
+                        <p>🌡️ Temp: ${dia.min_temp}°C - ${dia.max_temp}°C</p>
+                        <p>🌅 Sunrise: ${formatTime(dia.sunrise.getHours(), dia.sunrise.getMinutes())}</p>
+                        <p>🌇 Sunset: ${formatTime(dia.sunset.getHours(), dia.sunset.getMinutes())}</p>
+                    </div>
+                    </div>
+                </div>`;
+            });
+
+            contenedor.innerHTML = html;
+
+            contenedor.querySelectorAll(".accordion-header").forEach(header => {
+                header.addEventListener("click", () => {
+                    const body = header.nextElementSibling;
+                    const date = header.dataset.date;
+                    const isOpening = body.style.display !== "block";
+
+                    document.querySelectorAll('.accordion-body').forEach(b => {
+                        if (b !== body) b.style.display = 'none';
+                    });
+
+                    if (isOpening) {
+                        body.style.display = "block";
+                        const dailyData = globalResumenHorario.filter(r => r.fecha === date);
+                        mostrarGraficoViento(dailyData);
+                    } else {
+                        body.style.display = "none";
+                        mostrarGraficoViento(globalResumenHorario);
+                    }
+                });
+            });
+        }
+
+        function getWindDirectionSummary(directions) {
+            if (directions.length === 0) return "N/A";
+            
+            const toCardinal = (degrees) => {
+                const cardinals = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+                const index = Math.round(degrees / 45) % 8;
+                return cardinals[index];
+            };
+
+            const uniqueDirections = [...new Set(directions.map(toCardinal))];
+            if (uniqueDirections.length === 1) {
+                return uniqueDirections[0];
+            } else if (uniqueDirections.length > 1) {
+                const first = toCardinal(directions[0]);
+                const last = toCardinal(directions[directions.length - 1]);
+                if (first !== last) {
+                    return `${first} rotando a ${last} durante el día`;
+                }
+                return uniqueDirections.join(" / ");
+            }
+            return "Variable";
+        }
+
+        function mostrarGraficoViento(resumen) {
+            if (hourlyWindChart) {
+                hourlyWindChart.destroy();
+            }
+            const ctx = document.getElementById('graficoViento').getContext('2d');
+            const labels = resumen.map(r => `${r.horaLabel}\n${r.diaLabel}`);
+            const data = resumen.map(r => r.velocidad);
+            const gustData = resumen.map(r => r.gusts);
+            const precipData = resumen.map(r => r.precipitation);
+            const backgroundColors = resumen.map(r => r.color);
+
+            // NEW: Prepare data for the wind direction scatter plot
+            const windDirectionData = resumen.map((r, index) => ({
+                x: index,
+                y: r.velocidad, // Place the arrow on top of the wind speed bar
+                direction: r.direccion
+            }));
+
+            // NEW: Function to create a custom arrow point style
+            const createArrow = (degrees) => {
+                const size = 15;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.translate(size / 2, size / 2);
+                ctx.rotate(degrees * Math.PI / 180); // Rotate the canvas
+                ctx.beginPath();
+                ctx.moveTo(0, -size / 2);
+                ctx.lineTo(size / 2, size / 2);
+                ctx.lineTo(0, size / 4);
+                ctx.lineTo(-size / 2, size / 2);
+                ctx.closePath();
+                ctx.fillStyle = 'white'; // Arrow color
+                ctx.strokeStyle = '#211e2c';
+                ctx.lineWidth = 1;
+                ctx.fill();
+                ctx.stroke();
+                return canvas;
+            };
+
+            const annotations = {};
+
+            annotations.limitLine = {
+                type: 'line',
+                yMin: 20,
+                yMax: 20,
+                borderColor: 'rgba(231, 76, 60, 0.8)',
+                borderWidth: 2,
+                borderDash: [10, 5],
+                label: {
+                    content: '20 km/h',
+                    enabled: true,
+                    position: 'end',
+                    font: {
+                        family: "'VT323', monospace",
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    color: 'white',
+                    backgroundColor: 'rgba(231, 76, 60, 0.8)'
+                }
+            };
+
+            if (resumen.length > 0 && resumen.length === globalResumenHorario.length) { 
+                let currentDay = resumen[0].diaLabel;
+                let shade = true;
+                let startIndex = 0;
+
+                for (let i = 1; i <= resumen.length; i++) {
+                    if (i === resumen.length || resumen[i].diaLabel !== currentDay) {
+                        if (shade) {
+                            annotations[`box-${currentDay}`] = {
+                                type: 'box',
+                                xMin: startIndex - 0.5,
+                                xMax: i - 0.5,
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                borderWidth: 0,
+                                z: -100
+                            };
+                        }
+                        if (i < resumen.length) {
+                            startIndex = i;
+                            currentDay = resumen[i].diaLabel;
+                            shade = !shade;
+                        }
+                    }
+                }
+            }
+
+
+            hourlyWindChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Wind Speed (km/h)',
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
+                            borderWidth: 1,
+                            order: 2,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Wind Gusts (km/h)',
+                            data: gustData,
+                            type: 'line',
+                            borderColor: '#e74c3c',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            borderDash: [5, 5],
+                            yAxisID: 'y',
+                            order: 1,
+                        },
+                        {
+                            label: 'Precipitation (mm)',
+                            data: precipData,
+                            type: 'line',
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                            stepped: true,
+                            yAxisID: 'y1',
+                            order: 0,
+                        },
+                        // NEW: Dataset for Wind Direction Arrows
+                        {
+                            label: translations[languageSelect.value].wind_direction_label,
+                            data: windDirectionData,
+                            type: 'scatter',
+                            pointStyle: (context) => {
+                                // Create an arrow canvas based on the wind direction
+                                const direction = context.raw.direction;
+                                return createArrow(direction);
+                            },
+                            backgroundColor: 'transparent',
+                            borderColor: 'transparent',
+                            hoverRadius: 8,
+                            order: 3,
+                            yAxisID: 'y',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        annotation: {
+                            annotations: annotations
+                        },
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (context) => `Day: ${resumen[context[0].dataIndex].diaLabel}, Hour: ${resumen[context[0].dataIndex].horaLabel}`,
+                                label: (context) => {
+                                    const datasetLabel = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    const direction = context.dataset.label === translations[languageSelect.value].wind_direction_label ? context.raw.direction : null;
+                                    
+                                    if (direction !== null) {
+                                        return `${datasetLabel}: ${direction}°`;
+                                    }
+                                    
+                                    return `${datasetLabel}: ${value.toFixed(1)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            position: 'left',
+                            title: { display: true, text: 'Speed (km/h)', color: '#e0d6ff', font: { family: "'VT323', monospace" } },
+                            beginAtZero: true,
+                            grid: { color: 'rgba(224, 214, 255, 0.2)' },
+                            ticks: { color: '#e0d6ff', font: { family: "'VT323', monospace", size: 14 } }
+                        },
+                        y1: {
+                            position: 'right',
+                            title: { display: true, text: 'Precip. (mm)', color: '#e0d6ff', font: { family: "'VT323', monospace" } },
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#e0d6ff', font: { family: "'VT323', monospace", size: 14 } }
+                        },
+                        x: {
+                            ticks: { autoSkip: true, maxTicksLimit: 12, color: '#e0d6ff', font: { family: "'VT323', monospace", size: 14 } },
+                            grid: { color: 'rgba(224, 214, 255, 0.2)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- HELPER & LOGIC FUNCTIONS ---
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Screen Wake Lock was released');
+                    });
+                    console.log('Screen Wake Lock is active');
+                    showNotification('Screen lock disabled for flight.', 'info');
+                } catch (err) {
+                    console.error(`${err.name}, ${err.message}`);
+                    showNotification('Could not disable screen lock.', 'error');
+                }
+            } else {
+                console.log('Wake Lock API not supported.');
+                showNotification('Browser does not support screen lock prevention.', 'info');
+            }
+        }
+
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                    console.log('Screen Wake Lock released');
+                } catch (err) {
+                     console.error(`${err.name}, ${err.message}`);
+                }
+            }
+        }
+
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const toRadians = (deg) => deg * Math.PI / 180;
+            const toDegrees = (rad) => rad * 180 / Math.PI;
+
+            const y = Math.sin(toRadians(lon2 - lon1)) * Math.cos(toRadians(lat2));
+            const x = Math.cos(toRadians(lat1)) * Math.sin(toRadians(lat2)) -
+                      Math.sin(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.cos(toRadians(lon2 - lon1));
+            let brng = toDegrees(Math.atan2(y, x));
+            return (brng + 360) % 360;
+        }
+
+        function getDaylightWindow(dateStr, dailyData) {
+            const dateIndex = dailyData.time.indexOf(dateStr);
+            if (dateIndex === -1) return null;
+            const sunrise = new Date(dailyData.sunrise[dateIndex]);
+            const sunset = new Date(dailyData.sunset[dateIndex]);
+            return {
+                startHour: sunrise.getHours(), startMinute: sunrise.getMinutes(),
+                endHour: sunset.getHours(), endMinute: sunset.getMinutes()
+            };
+        }
+
+        function generarResumenSemanal(dailyData) {
+            if (!dailyData || !dailyData.time) return [];
+            
+            const resumen = [];
+            const currentLang = languageSelect.value || 'en';
+            const locales = { en: 'en-US', es: 'es-AR', fr: 'fr-FR' };
+            const locale = locales[currentLang];
+
+            for (let i = 0; i < dailyData.time.length; i++) {
+                const fecha = dailyData.time[i];
+                const diaNombre = new Date(fecha + 'T00:00:00').toLocaleDateString(locale, { weekday: "long", day: "numeric" });
+                
+                resumen.push({
+                    fecha,
+                    dia: diaNombre.charAt(0).toUpperCase() + diaNombre.slice(1),
+                    sunrise: new Date(dailyData.sunrise[i]),
+                    sunset: new Date(dailyData.sunset[i]),
+                    max_temp: dailyData.temperature_2m_max[i],
+                    min_temp: dailyData.temperature_2m_min[i]
+                });
+            }
+            return resumen;
+        }
+
+        function generarResumenHorario(windData, dailyData) {
+            if (!windData || !dailyData) return [];
+            return windData.time.map((t, i) => {
+                const date = new Date(t);
+                const fechaDia = date.toLocaleDateString("en-CA");
+                const daylightWindow = getDaylightWindow(fechaDia, dailyData);
+                if (!daylightWindow || date.getHours() < daylightWindow.startHour || date.getHours() >= daylightWindow.endHour) return null;
+
+                const velocidad = windData.wind_speed_10m[i];
+                const gusts = windData.wind_gusts_10m[i];
+                const precip = windData.precipitation[i];
+                const direccion = windData.wind_direction_10m[i]; // NEW: Add wind direction
+
+                return {
+                    fecha: fechaDia,
+                    horaLabel: `${date.getHours()}:00`,
+                    diaLabel: date.toLocaleDateString("es-AR", { weekday: "short" }),
+                    velocidad: parseFloat(velocidad),
+                    gusts: parseFloat(gusts),
+                    precipitation: parseFloat(precip),
+                    direccion: parseFloat(direccion), // NEW: Add wind direction to the object
+                    color: getColorPorVelocidad(velocidad)
+                };
+            }).filter(item => item !== null);
+        }
+
+        function getColorPorVelocidad(kmH, isAnemometer = false) {
+            const alpha = isAnemometer ? '1' : '0.8';
+            if (kmH < 5) return `rgba(75, 192, 192, ${alpha})`;   // Light Blue/Cyan
+            if (kmH < 10) return `rgba(116, 204, 116, ${alpha})`;  // Light Green
+            if (kmH < 15) return `rgba(173, 204, 93, ${alpha})`;   // Yellow-Green
+            if (kmH < 20) return `rgba(255, 206, 86, ${alpha})`;   // Yellow
+            if (kmH < 30) return `rgba(255, 159, 64, ${alpha})`;   // Orange
+            if (kmH < 45) return `rgba(255, 99, 132, ${alpha})`;   // Red
+            return `rgba(153, 102, 255, ${alpha})`;       // Violet
+        }
+
+        function formatTime(hour, minute = 0) {
+            return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        }
+
+        const translations = {
+            en: {
+                connect: "CONNECT", disconnect: "DISCONNECT", log: "Log", fly: "Fly", settings: "Settings", zona: "Zone:", hora: "Hour:",
+                today: "Today", wind: "Wind", max_gusts: "Max Gusts", temp: "Temp",
+                sunrise: "Sunrise", sunset: "Sunset", flight_summary: "Flight Summary",
+                log_flight: "Log Flight", discard: "Discard", start_flight: "Start Flight", stop_flight: "Stop Flight",
+                exit_fly_mode: "Exit Fly Mode", speed: "Speed", altitude: "Altitude", gforce: "G-Force",
+                duration: "Duration", distance: "Distance", max_altitude: "Max Altitude", new_flight_log: "New Flight Log",
+                save_log: "Save Log", past_logs: "Past Logs (Local)", back_to_dashboard: "Back to Dashboard",
+                language: "Language", add_flying_site: "Add Flying Site", site_name: "Site Name",
+                coordinates: "Coordinates (Lat, Lon)", save_site: "Save Site",
+                join_club: "Join a Flying Club",
+                docs: "Docs", buy_tokens: "Buy Tokens", backup_wallet: "Backup/Restore Wallet", close: "Close",
+                chat_wallet: "ChatWallet (Test)", metamask: "MetaMask",
+                flyable_days_title: "Flyable Days",
+                support_flylog_banner: "Token Presale! Participate now for exclusive benefits on the platform.",
+                traffic_alert: "TRAFFIC ALERT: {callsign} at {altitude}, {distance}km away!",
+                cloud_base: "Cloud Base",
+                create_club: "Create Club",
+                join: "JOIN",
+                awaiting_approval: "Awaiting Approval",
+                flying_clubs: "Flying Clubs",
+                in_development: "(In Development)",
+                program_trip: "Program Trip", finish_planning: "Finish Planning", trip_plan: "Trip Plan", trip_completed: "Trip",
+                share_trip: "Share Trip", join_trip: "Join Trip", copy_id: "Copy Link", total_distance: "Total:",
+                wind_direction_label: "Wind Direction",
+                pilot_profile: "Pilot Profile", pilot_name: "Pilot Name", brevet: "Brevet",
+                onchain_logs: "On-Chain Flight Logs", share_brevet: "Share Brevet", make_public: "Make Public", make_private: "Make Private",
+                disconnect_wallet: "Disconnect Wallet?", disconnect_wallet_confirm: "Are you sure you want to disconnect and forget this wallet? You will need your recovery phrase to restore it.",
+                cancel: "Cancel",
+                api_base_url: "API Base URL (Optional)", saved_sites: "Saved Sites & APIs",
+                connect_account: "Connect Account", connect_account_desc: "Create a new secure account or restore an existing one from your recovery phrase.",
+                create_new_account: "Create New Account", restore_account: "Restore Account",
+                unlock_wallet: "Unlock Wallet", unlock_wallet_desc: "Enter your password to unlock your encrypted wallet.",
+                unlock: "Unlock", forget_wallet: "Forget Wallet",
+                update_profile: "Update Profile", onchain_profile: "On-Chain Profile", register_onchain_profile: "Register Profile on Blockchain"
+            },
+            es: {
+                connect: "CONECTAR", disconnect: "DESCONECTAR", log: "Log de vuelos", fly: "Volar", settings: "Ajustes", zona: "Zona:", hora: "Hora:",
+                today: "Hoy", wind: "Viento", max_gusts: "Ráfagas Máx", temp: "Temp",
+                sunrise: "Amanecer", sunset: "Atardecer", flight_summary: "Resumen de Vuelo",
+                log_flight: "Registrar Vuelo", discard: "Descartar", start_flight: "Iniciar Vuelo", stop_flight: "Detener Vuelo",
+                exit_fly_mode: "Salir Modo Vuelo", speed: "Velocidad", altitude: "Altitud", gforce: "Fuerza G",
+                duration: "Duración", distance: "Distancia", max_altitude: "Altitud Máx", new_flight_log: "Nuevo Registro de Vuelo",
+                save_log: "Guardar Registro", past_logs: "Registros Anteriores (Local)", back_to_dashboard: "Volver al Panel",
+                language: "Idioma", add_flying_site: "Añadir Sitio de Vuelo", site_name: "Nombre del Sitio",
+                coordinates: "Coordenadas (Lat, Lon)", save_site: "Guardar Sitio",
+                join_club: "Unirse a un Club",
+                docs: "Docs", buy_tokens: "Comprar Tokens", backup_wallet: "Respaldar/Restaurar Billetera", close: "Cerrar",
+                chat_wallet: "ChatWallet (Test)", metamask: "MetaMask",
+                flyable_days_title: "Días Volables",
+                support_flylog_banner: "¡Preventa de Tokens! Participa ahora y obtén beneficios exclusivos en la plataforma.",
+                traffic_alert: "¡ALERTA DE TRÁFICO: {callsign} a {altitude}, {distance}km de distancia!",
+                cloud_base: "Base de Nubes",
+                create_club: "Crear Club",
+                join: "UNIRSE",
+                awaiting_approval: "Esperando Aprobación",
+                flying_clubs: "Clubes de Vuelo",
+                in_development: "(En Desarrollo)",
+                program_trip: "Programar Viaje", finish_planning: "Finalizar Plan", trip_plan: "Plan de Viaje", trip_completed: "Viaje",
+                share_trip: "Compartir Viaje", join_trip: "Unirse a Viaje", copy_id: "Copiar Enlace", total_distance: "Total:",
+                wind_direction_label: "Dirección del Viento",
+                direction: "Dirección",
+                pilot_profile: "Perfil de Piloto", pilot_name: "Nombre de Piloto", brevet: "Brevet",
+                onchain_logs: "Logs de Vuelo On-Chain", share_brevet: "Compartir Brevet", make_public: "Hacer Público", make_private: "Hacer Privado",
+                disconnect_wallet: "¿Desconectar Billetera?", disconnect_wallet_confirm: "¿Estás seguro de que quieres desconectar y olvidar esta billetera? Necesitarás tu frase de recuperación para restaurarla.",
+                cancel: "Cancelar",
+                api_base_url: "URL Base de API (Opcional)", saved_sites: "Sitios y APIs Guardados",
+                connect_account: "Conectar Cuenta", connect_account_desc: "Crea una nueva cuenta segura o restaura una existente desde tu frase de recuperación.",
+                create_new_account: "Crear Nueva Cuenta", restore_account: "Restaurar Cuenta",
+                unlock_wallet: "Desbloquear Billetera", unlock_wallet_desc: "Ingresa tu contraseña para desbloquear tu billetera encriptada.",
+                unlock: "Desbloquear", forget_wallet: "Olvidar Billetera",
+                update_profile: "Actualizar Perfil", onchain_profile: "Perfil On-Chain", register_onchain_profile: "Registrar Perfil en Blockchain"
+            },
+            fr: {
+                connect: "CONNECTER", disconnect: "DÉCONNECTER", log: "Journal", fly: "Voler", settings: "Paramètres", zona: "Zone:", hora: "Heure:",
+                today: "Aujourd'hui", wind: "Vent", max_gusts: "Rafales Max", temp: "Temp",
+                sunrise: "Lever du soleil", sunset: "Coucher du soleil", flight_summary: "Résumé du Vol",
+                log_flight: "Enregistrer le Vol", discard: "Rejeter", start_flight: "Démarrer le Vol", stop_flight: "Arrêter le Vol",
+                exit_fly_mode: "Quitter le Mode Vol", speed: "Vitesse", altitude: "Altitude", gforce: "Force G",
+                duration: "Durée", distance: "Distance", max_altitude: "Altitude Max", new_flight_log: "Nouveau Journal de Vol",
+                save_log: "Sauvegarder", past_logs: "Journaux Précédents (Local)", back_to_dashboard: "Retour au Tableau de Bord",
+                language: "Langue", add_flying_site: "Ajouter un Site de Vol", site_name: "Nom du Site",
+                coordinates: "Coordennées (Lat, Lon)", save_site: "Sauvegarder Site",
+                join_club: "Rejoindre un Club",
+                docs: "Docs", buy_tokens: "Acheter des Jetons", backup_wallet: "Sauvegarder/Restaurer Portefeuille", close: "Fermer",
+                chat_wallet: "ChatWallet (Test)", metamask: "MetaMask",
+                flyable_days_title: "Jours Volables",
+                support_flylog_banner: "Prévente de Jetons ! Participez maintenant pour des avantages exclusifs sur la plateforme.",
+                traffic_alert: "ALERTE TRAFIC: {callsign} à {altitude}, à {distance}km!",
+                cloud_base: "Base des Nuages",
+                create_club: "Créer un club",
+                join: "REJOINDRE",
+                awaiting_approval: "En attente d'approbation",
+                flying_clubs: "Clubs de Vol",
+                in_development: "(En Développement)",
+                program_trip: "Programmer le Vol", finish_planning: "Terminer le Plan", trip_plan: "Plan de Vol", trip_completed: "Vol",
+                share_trip: "Partager le Vol", join_trip: "Rejoindre le Vol", copy_id: "Copier le Lien", total_distance: "Total:",
+                wind_direction_label: "Direction du Vent",
+                direction: "Direction",
+                pilot_profile: "Profil du Pilote", pilot_name: "Nom du Pilote", brevet: "Brevet",
+                onchain_logs: "Journaux de Vol On-Chain", share_brevet: "Partager le Brevet", make_public: "Rendre Public", make_private: "Rendre Privé",
+                disconnect_wallet: "Déconnecter le portefeuille?", disconnect_wallet_confirm: "Êtes-vous sûr de vouloir déconnecter et oublier ce portefeuille? Vous aurez besoin de votre phrase de récupération pour le restaurer.",
+                cancel: "Annuler",
+                api_base_url: "URL de base de l'API (Optionnel)", saved_sites: "Sites et API Enregistrés",
+                connect_account: "Connecter un Compte", connect_account_desc: "Créez un nouveau compte sécurisé ou restaurez un compte existant à partir de votre phrase de récupération.",
+                create_new_account: "Créer un Nouveau Compte", restore_account: "Restaurer un Compte",
+                unlock_wallet: "Déverrouiller le Portefeuille", unlock_wallet_desc: "Entrez votre mot de passe pour déverrouiller votre portefeuille crypté.",
+                unlock: "Déverrouiller", forget_wallet: "Oublier le Portefeuille",
+                update_profile: "Mettre à Jour le Profil", onchain_profile: "Profil On-Chain", register_onchain_profile: "Enregistrer le Profil sur la Blockchain"
+            }
+        };
+
+        function setLanguage(lang) {
+            document.querySelectorAll('[data-translate]').forEach(el => {
+                const key = el.dataset.translate;
+                if (translations[lang] && translations[lang][key]) {
+                    // Handle special case for join button to preserve its state
+                    if (el.classList.contains('join-club-btn') && el.disabled) {
+                        el.textContent = translations[lang].awaiting_approval;
+                    } else {
+                        el.textContent = translations[lang][key];
+                    }
+                }
+            });
+            // Also update connect button state text
+            const connectKey = connectedAccount ? 'disconnect' : 'connect';
+            connectBtn.textContent = connectedAccount ? `${connectedAccount.substring(0, 6)}...${connectedAccount.substring(connectedAccount.length - 4)}` : translations[lang][connectKey];
+
+
+            if (windData && dailyData) {
+                mostrarResumenSemanal(generarResumenSemanal(dailyData));
+            }
+            localStorage.setItem('flylog_language', lang);
+        }
+
+        function populateZoneSelector() {
+            zonaSelect.innerHTML = '';
+            for (let nombre in zonasDeVuelo) {
+                const opt = document.createElement("option");
+                opt.value = nombre;
+                opt.textContent = nombre;
+                zonaSelect.appendChild(opt);
+            }
+        }
+
+        function saveNewFlyingSite() {
+            const nameInput = document.getElementById('site-name-input');
+            const coordsInput = document.getElementById('site-coords-input');
+            const apiInput = document.getElementById('site-api-input');
+            const name = nameInput.value.trim();
+            const coords = coordsInput.value.split(',').map(c => parseFloat(c.trim()));
+            const api = apiInput.value.trim();
+
+            if (name && coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+                zonasDeVuelo[name] = { lat: coords[0], lon: coords[1], api: api };
+                populateZoneSelector();
+                zonaSelect.value = name;
+                zonaSelect.dispatchEvent(new Event('change'));
+                showNotification(`Site "${name}" added!`, 'success');
+                nameInput.value = '';
+                coordsInput.value = '';
+                apiInput.value = '';
+                saveSettings(); // Persist changes
+                displaySavedSitesAndApis(); // Refresh the list
+            } else {
+                showNotification("Invalid name or coordinates.");
+            }
+        }
+
+        function savePilotProfile() {
+            if (!connectedAccount) return;
+            pilotProfile.name = pilotNameInput.value.trim() || "Pilot";
+            
+            const encryptedProfile = simpleEncrypt(pilotProfile, connectedAccount);
+            localStorage.setItem(`flylog_brevet_${connectedAccount}`, encryptedProfile);
+        }
+
+        function loadPilotProfile() {
+            if (!connectedAccount) return;
+            
+            const encryptedProfile = localStorage.getItem(`flylog_brevet_${connectedAccount}`);
+            if (encryptedProfile) {
+                const decryptedProfile = simpleDecrypt(encryptedProfile, connectedAccount);
+                if (decryptedProfile) {
+                    pilotProfile = decryptedProfile;
+                }
+            }
+           
+            // Load logs for the current account
+            const savedLogs = localStorage.getItem(`flylog_logs_${connectedAccount}`);
+             if (savedLogs) {
+                try {
+                    flightLogs = JSON.parse(savedLogs);
+                } catch (e) { flightLogs = []; }
+            } else {
+                 flightLogs = [];
+            }
+            displayPastLogs();
+
+
+            pilotNameInput.value = pilotProfile.name || 'Pilot';
+        }
+        
+        // This is a simple XOR cipher for demonstration purposes ONLY for non-critical data.
+        function simpleEncrypt(data, key) {
+            const dataStr = JSON.stringify(data);
+            let result = '';
+            for (let i = 0; i < dataStr.length; i++) {
+                result += String.fromCharCode(dataStr.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            return btoa(result); // Base64 encode to handle special characters
+        }
+
+        function simpleDecrypt(encryptedData, key) {
+            try {
+                const decodedData = atob(encryptedData);
+                let result = '';
+                for (let i = 0; i < decodedData.length; i++) {
+                    result += String.fromCharCode(decodedData.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+                }
+                return JSON.parse(result);
+            } catch (e) {
+                console.error("Decryption failed:", e);
+                return null; // Return null if decryption or parsing fails
+            }
+        }
+
+        function saveSettings() {
+            savePilotProfile();
+            localStorage.setItem('flylog_language', languageSelect.value);
+            const customSites = {};
+            for (const siteName in zonasDeVuelo) {
+                if (!["Berazategui", "Merlo Oeste", "La Plata"].includes(siteName)) {
+                    customSites[siteName] = zonasDeVuelo[siteName];
+                }
+            }
+            localStorage.setItem('flylog_sites', JSON.stringify(customSites));
+        }
+
+        function loadSettings() {
+            const savedLang = localStorage.getItem('flylog_language') || 'en';
+            setLanguage(savedLang);
+            languageSelect.value = savedLang;
+            
+            const savedSites = localStorage.getItem('flylog_sites');
+            if (savedSites) {
+                try {
+                    const customSites = JSON.parse(savedSites);
+                    Object.assign(zonasDeVuelo, customSites);
+                } catch (e) {
+                    console.error("Failed to parse saved flying sites:", e);
+                }
+            }
+            displaySavedSitesAndApis(); // Display the loaded sites
+
+            // Note: Logs are now loaded in loadPilotProfile after a wallet is connected.
+            
+            // Load club join status
+            joinClubButtons.forEach(btn => {
+                const clubId = btn.dataset.clubId;
+                const status = localStorage.getItem(`flylog_club_status_${clubId}`);
+                if (status === 'awaiting') {
+                    btn.disabled = true;
+                    btn.textContent = translations[savedLang].awaiting_approval;
+                }
+            });
+        }
+
+        function displaySavedSitesAndApis() {
+            const apiList = document.getElementById('api-list');
+            apiList.innerHTML = ''; // Clear current list
+            const defaultSites = ["Berazategui", "Merlo Oeste", "La Plata"];
+
+            const customSiteNames = Object.keys(zonasDeVuelo).filter(name => !defaultSites.includes(name));
+
+            if (customSiteNames.length === 0) {
+                apiList.innerHTML = '<li>No custom sites saved yet.</li>';
+                return;
+            }
+            
+            customSiteNames.forEach(siteName => {
+                const site = zonasDeVuelo[siteName];
+                const li = document.createElement('li');
+                li.className = 'api-entry';
+                
+                const apiText = site.api ? `<code>${site.api}</code>` : '<em>No API set</em>';
+
+                li.innerHTML = `
+                    <div>
+                        <strong>${siteName}</strong>
+                        <p style="font-size: 0.9rem; margin: 0.5rem 0 0 0; color: var(--text-primary);">${apiText}</p>
+                    </div>
+                    <button class="delete-api-btn" onclick="deleteSite('${siteName}')">&times;</button>
+                `;
+                apiList.appendChild(li);
+            });
+        }
+
+        function deleteSite(siteName) {
+            // Replaced window.confirm with a simple confirm
+            if (confirm(`Are you sure you want to delete the site "${siteName}"?`)) {
+                delete zonasDeVuelo[siteName];
+                saveSettings();
+                populateZoneSelector();
+                displaySavedSitesAndApis();
+                showNotification(`Site "${siteName}" deleted.`, 'success');
+            }
+        }
+
+        // --- START THE APP ---
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+    </script>
+</body>
+
+</html>
+
+
